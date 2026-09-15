@@ -35,6 +35,7 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/v1/receipts/batch", s.acceptBatch)
 	mux.HandleFunc("GET /api/v1/runtime", func(w http.ResponseWriter, r *http.Request) {
 		if s.Runtime != nil {
 			respond(w, 200, s.Runtime())
@@ -178,6 +179,9 @@ func (s *Server) Handler() http.Handler {
 	})
 }
 func (s *Server) allow() bool {
+	return s.allowCost(1)
+}
+func (s *Server) allowCost(cost float64) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	now := time.Now()
@@ -186,10 +190,10 @@ func (s *Server) allow() bool {
 		s.tokens = 60
 	}
 	s.last = now
-	if s.tokens < 1 {
+	if s.tokens < cost {
 		return false
 	}
-	s.tokens--
+	s.tokens -= cost
 	return true
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {

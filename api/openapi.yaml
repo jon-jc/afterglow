@@ -8,6 +8,34 @@ servers:
 security:
   - bearer: []
 paths:
+  /api/v1/receipts/batch:
+    post:
+      operationId: acceptReceiptBatch
+      summary: Accept up to 50 receipts with independent transaction outcomes
+      description: Maximum request body 32768 bytes. Items consume individual rate-limit tokens. Retry ambiguous or transient failures using the same event IDs and payloads. Unsupported schema versions can be durably accepted and later quarantined by the worker. This is a synthetic partner contract.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [receipts]
+              properties:
+                receipts:
+                  type: array
+                  minItems: 1
+                  maxItems: 50
+                  items: {$ref: '#/components/schemas/Receipt'}
+      responses:
+        '202': {description: All items durably accepted or replayed. Body includes accepted/rejected/replayed counts and ordered results with zero-based index, status, id, replayed, retryable and detail.}
+        '207': {description: One or more items rejected. Inspect each result; 400 malformed item, 422 invalid identifiers, 409 conflicting event identity, 503 transient storage error. Accepted items remain committed.}
+        '400': {description: Malformed, oversized or unknown-field envelope; no items attempted}
+        '401': {description: Invalid credential}
+        '415': {description: JSON content type required}
+        '422': {description: Batch must contain 1 to 50 items; no items attempted}
+        '429': {description: Insufficient per-item admission tokens; no items attempted; Retry-After provided}
+        '503': {description: Request concurrency capacity unavailable}
   /healthz:
     get:
       operationId: getLiveness
