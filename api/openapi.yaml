@@ -8,6 +8,21 @@ servers:
 security:
   - bearer: []
 paths:
+  /api/v1/airports:
+    get:
+      operationId: searchAirportCatalog
+      summary: Search real US scheduled-service airport reference data
+      description: Proxies the separate Go airport service. Includes US territories. No advertising rights or real-time flight information is implied. Each response includes source, scope, fetch time, version hash and stale status.
+      parameters:
+        - {in: query, name: q, schema: {type: string, maxLength: 100}}
+        - {in: query, name: region, schema: {type: string, maxLength: 20}}
+        - {in: query, name: limit, schema: {type: integer, minimum: 1, maximum: 200, default: 50}}
+        - {in: query, name: offset, schema: {type: integer, minimum: 0, default: 0}}
+      responses:
+        '200': {description: "Current page in airports, all matching locations in map_airports, matched/total counts, regions, fetched_at, source_modified, version, source, scope, stale and warning. Sorted by source identifier."}
+        '400': {description: "Invalid filters or pagination"}
+        '401': {description: "Invalid credential"}
+        '503': {description: "Catalog has not loaded or the separate service is unavailable. Financial APIs continue independently."}
   /api/v1/receipts/batch:
     post:
       operationId: acceptReceiptBatch
@@ -28,29 +43,29 @@ paths:
                   maxItems: 50
                   items: {$ref: '#/components/schemas/Receipt'}
       responses:
-        '202': {description: All items durably accepted or replayed. Body includes accepted/rejected/replayed counts and ordered results with zero-based index, status, id, replayed, retryable and detail.}
-        '207': {description: One or more items rejected. Inspect each result; 400 malformed item, 422 invalid identifiers, 409 conflicting event identity, 503 transient storage error. Accepted items remain committed.}
-        '400': {description: Malformed, oversized or unknown-field envelope; no items attempted}
-        '401': {description: Invalid credential}
-        '415': {description: JSON content type required}
-        '422': {description: Batch must contain 1 to 50 items; no items attempted}
-        '429': {description: Insufficient per-item admission tokens; no items attempted; Retry-After provided}
-        '503': {description: Request concurrency capacity unavailable}
+        '202': {description: "All items durably accepted or replayed. Body includes accepted/rejected/replayed counts and ordered results with zero-based index, status, id, replayed, retryable and detail."}
+        '207': {description: "One or more items rejected. Inspect each result; 400 malformed item, 422 invalid identifiers, 409 conflicting event identity, 503 transient storage error. Accepted items remain committed."}
+        '400': {description: "Malformed, oversized or unknown-field envelope; no items attempted"}
+        '401': {description: "Invalid credential"}
+        '415': {description: "JSON content type required"}
+        '422': {description: "Batch must contain 1 to 50 items; no items attempted"}
+        '429': {description: "Insufficient per-item admission tokens; no items attempted; Retry-After provided"}
+        '503': {description: "Request concurrency capacity unavailable"}
   /healthz:
     get:
       operationId: getLiveness
       security: []
       summary: Process liveness
       responses:
-        '200': {description: Process is alive}
+        '200': {description: "Process is alive"}
   /readyz:
     get:
       operationId: getReadiness
       security: []
       summary: Database connectivity and shutdown readiness
       responses:
-        '200': {description: Accepting work}
-        '503': {description: Not ready}
+        '200': {description: "Accepting work"}
+        '503': {description: "Not ready"}
   /api/v1/reservations:
     post:
       operationId: reservePlayback
@@ -78,15 +93,15 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Reservation'}
-        '200': {description: Existing reservation replayed for the same normalized payload and key. Includes Idempotent-Replayed header.}
-        '409': {description: Insufficient remaining budget or idempotency key conflicts with prior content}
-        '404': {description: Unknown campaign or screen}
-        '422': {description: Invalid IDs or cost}
-        '400': {description: Malformed or unknown JSON fields}
-        '401': {description: Invalid credential}
-        '415': {description: JSON content type required}
-        '429': {description: Local mutation rate limit reached; Retry-After provided}
-        '503': {description: Capacity or dependency unavailable}
+        '200': {description: "Existing reservation replayed for the same normalized payload and key. Includes Idempotent-Replayed header."}
+        '409': {description: "Insufficient remaining budget or idempotency key conflicts with prior content"}
+        '404': {description: "Unknown campaign or screen"}
+        '422': {description: "Invalid IDs or cost"}
+        '400': {description: "Malformed or unknown JSON fields"}
+        '401': {description: "Invalid credential"}
+        '415': {description: "JSON content type required"}
+        '429': {description: "Local mutation rate limit reached; Retry-After provided"}
+        '503': {description: "Capacity or dependency unavailable"}
   /api/v1/receipts:
     post:
       operationId: acceptPlaybackReceipt
@@ -108,13 +123,13 @@ paths:
                   id: {type: string}
                   replayed: {type: boolean}
                   durability: {const: database_and_outbox_committed}
-        '409': {description: Event ID reused with different normalized content}
-        '422': {description: Invalid identifiers}
-        '400': {description: Invalid or oversized JSON}
-        '401': {description: Invalid credential}
-        '415': {description: JSON content type required}
-        '429': {description: Rate limited}
-        '503': {description: Capacity or database unavailable}
+        '409': {description: "Event ID reused with different normalized content"}
+        '422': {description: "Invalid identifiers"}
+        '400': {description: "Invalid or oversized JSON"}
+        '401': {description: "Invalid credential"}
+        '415': {description: "JSON content type required"}
+        '429': {description: "Rate limited"}
+        '503': {description: "Capacity or database unavailable"}
   /api/v1/deliveries/{id}/replay:
     post:
       operationId: replayDelivery
@@ -125,10 +140,10 @@ paths:
           required: true
           schema: {type: string}
       responses:
-        '202': {description: Quarantined or failed receipt requeued; normal validation still applies}
-        '409': {description: Delivery not eligible for replay or not visible to this tenant}
-        '401': {description: Invalid credential}
-        '503': {description: Database unavailable}
+        '202': {description: "Quarantined or failed receipt requeued; normal validation still applies"}
+        '409': {description: "Delivery not eligible for replay or not visible to this tenant"}
+        '401': {description: "Invalid credential"}
+        '503': {description: "Database unavailable"}
   /api/v1/snapshot:
     get:
       operationId: getOperationsSnapshot
@@ -136,22 +151,22 @@ paths:
       responses:
         '200':
           description: Campaign balances, shared screen inventory, newest 100 reservations and receipts, newest 80 audit records, all-time status counts and oldest_pending_ms. Timestamps are Unix milliseconds. PostgreSQL reads use a repeatable-read transaction.
-        '401': {description: Invalid credential}
-        '503': {description: Database unavailable}
+        '401': {description: "Invalid credential"}
+        '503': {description: "Database unavailable"}
   /api/v1/runtime:
     get:
       operationId: getRuntime
       summary: Execution mode, storage, role, paused state and breaker state
       responses:
-        '200': {description: Runtime configuration without credentials}
-        '401': {description: Invalid credential}
+        '200': {description: "Runtime configuration without credentials"}
+        '401': {description: "Invalid credential"}
   /api/v1/metrics:
     get:
       operationId: getPrometheusMetrics
       summary: Prometheus counters and processing duration
       responses:
-        '200': {description: Prometheus exposition format}
-        '401': {description: Invalid credential}
+        '200': {description: "Prometheus exposition format"}
+        '401': {description: "Invalid credential"}
 components:
   securitySchemes:
     bearer:

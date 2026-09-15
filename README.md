@@ -28,6 +28,8 @@ Open **http://127.0.0.1:8090** and click **Simulate traffic**. The local run use
 
 **GoLand:** open this folder, let the Go module index, and run the checked-in **Afterglow** configuration. Set breakpoints in `Reserve`, `Accept`, and `Process`. Windows users can also run `./scripts/start.ps1`.
 
+**Airport catalog:** start `go run ./cmd/airports` in a second terminal (or the **Airport Catalog** GoLand configuration), then choose **Airports**. The separate Go service fetches all source-listed US scheduled-service airports and territories, with search, region filters, map, pagination and a persistent last-good snapshot. [Coverage, source and architecture](docs/airports.md).
+
 For PostgreSQL plus the official Pub/Sub emulator, see [operations](docs/operations.md). `TRANSPORT=pubsub` uses the Google Go v2 client. The local transport never claims to be Pub/Sub.
 
 ## Try the failures
@@ -58,6 +60,7 @@ flowchart LR
 ```
 
 - **202 is a precise promise.** Receipt and dispatch intent committed to SQL. Broker delivery and settlement happen later.
+- **Partial success is explicit.** The batch receipt endpoint returns a result for each item, retains accepted neighbors and supports safe retries with unchanged identities.
 - **At-least-once delivery; one financial effect.** Event identity and reservation state guard against duplication.
 - **Money is integer micros.** Reservation prices are immutable. SQL enforces `spent + reserved <= budget`.
 - **Failure has an owner.** Dispatch leases have fencing tokens. Stale workers cannot overwrite newer claims.
