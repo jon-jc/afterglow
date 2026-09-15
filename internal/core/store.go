@@ -59,6 +59,11 @@ func (s *Store) Migrate(ctx context.Context) error {
 		return err
 	}
 	defer tx.Rollback()
+	if s.Postgres {
+		if _, err = tx.ExecContext(ctx, `SELECT pg_advisory_xact_lock(114921873)`); err != nil {
+			return err
+		}
+	}
 	for _, q := range strings.Split(schema, ";") {
 		if strings.TrimSpace(q) != "" {
 			if _, err = tx.ExecContext(ctx, q); err != nil {
@@ -144,9 +149,13 @@ func (s *Store) Reserve(ctx context.Context, tenant, key string, in ReservationI
 		return Reservation{}, false, ErrBudget
 	}
 	r := Reservation{ID: ID(), CampaignID: in.CampaignID, ScreenID: in.ScreenID, Cost: in.Cost, State: "held", Created: millis(), Expires: millis() + int64(15*time.Minute/time.Millisecond)}
-	_, err = tx.ExecContext(ctx, `INSERT INTO reservations(tenant,id,campaign,screen,cost,state,idem_key,fingerprint,created,expires) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`, tenant, r.ID, r.CampaignID, r.ScreenID, r.Cost, r.State, key, digest(in), r.Created, r.Expires)
+	res, err = tx.ExecContext(ctx, `INSERT INTO reservations(tenant,id,campaign,screen,cost,state,idem_key,fingerprint,created,expires) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) ON CONFLICT(tenant,idem_key) DO NOTHING`, tenant, r.ID, r.CampaignID, r.ScreenID, r.Cost, r.State, key, digest(in), r.Created, r.Expires)
 	if err != nil {
 		return Reservation{}, false, err
+	}
+	n, _ = res.RowsAffected()
+	if n == 0 {
+		return Reservation{}, false, ErrConflict
 	}
 	if err = audit(ctx, tx, tenant, "reserved", r.ID, fmt.Sprintf("%d micros held; %s", r.Cost, r.ScreenID)); err != nil {
 		return Reservation{}, false, err
@@ -183,6 +192,9 @@ func (s *Store) Accept(ctx context.Context, tenant string, r Receipt) (string, b
 		return id, true, nil
 	}
 	if _, err = tx.ExecContext(ctx, `INSERT INTO outbox(tenant,id) VALUES($1,$2)`, tenant, id); err != nil {
+		return "", false, err
+	}
+	if err = persistTrace(ctx, tx, tenant, id); err != nil {
 		return "", false, err
 	}
 	if err = audit(ctx, tx, tenant, "accepted", id, "Receipt and dispatch intent committed together"); err != nil {

@@ -14,6 +14,10 @@ import (
 
 	"github.com/jon-jc/afterglow/internal/core"
 	"github.com/jon-jc/afterglow/internal/httpapi"
+	"github.com/jon-jc/afterglow/internal/pipeline"
+	"github.com/jon-jc/afterglow/internal/telemetry"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
 func env(k, d string) string {
@@ -50,6 +54,15 @@ func run() error {
 	}
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
+	closeTelemetry, err := telemetry.Start(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		c, stop := context.WithTimeout(context.Background(), 3*time.Second)
+		defer stop()
+		_ = closeTelemetry(c)
+	}()
 	store, err := core.Open(ctx, dsn)
 	if err != nil {
 		return err
@@ -66,6 +79,45 @@ func run() error {
 	}
 	var draining atomic.Bool
 	api := &httpapi.Server{Store: store, Tenant: tenant, APIKey: os.Getenv("API_KEY"), Demo: demo, Ready: func() bool { return !draining.Load() }}
+	reg := prometheus.NewRegistry()
+	worker := pipeline.New(store, reg)
+	transport := env("TRANSPORT", "local")
+	role := env("ROLE", "all")
+	if role != "all" && role != "api" && role != "worker" {
+		return core.ErrInvalid
+	}
+	workerCtx, stopWorker := context.WithCancel(context.Background())
+	defer stopWorker()
+	workerDone := make(chan struct{})
+	var bus *pipeline.PubSub
+	if transport == "pubsub" {
+		bus, err = pipeline.NewPubSub(ctx, os.Getenv("GCP_PROJECT_ID"), env("PUBSUB_TOPIC", "afterglow-receipts"), env("PUBSUB_SUBSCRIPTION", "afterglow-reconciler"))
+		if err != nil {
+			return err
+		}
+		defer bus.Close()
+		worker.Publisher = bus
+	} else if transport != "local" {
+		return core.ErrInvalid
+	}
+	if role != "api" {
+		go func() { defer close(workerDone); worker.Run(workerCtx) }()
+		if bus != nil {
+			go func() {
+				if e := bus.Receive(workerCtx, worker); e != nil && workerCtx.Err() == nil {
+					slog.Error("subscriber_failed", "error", e)
+					cancel()
+				}
+			}()
+		}
+	} else {
+		close(workerDone)
+	}
+	api.Metrics = promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
+	api.DemoHandler = httpapi.Demo(store, worker, tenant)
+	api.Runtime = func() any {
+		return map[string]any{"transport": transport, "storage": map[bool]string{true: "PostgreSQL", false: "SQLite WAL"}[store.Postgres], "demo": demo, "paused": worker.Paused.Load(), "breaker_open": worker.BreakerOpen(), "role": role}
+	}
 	srv := &http.Server{Addr: addr, Handler: api.Handler(), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	done := make(chan error, 1)
 	go func() { slog.Info("afterglow_started", "address", addr, "demo", demo); done <- srv.ListenAndServe() }()
@@ -77,7 +129,14 @@ func run() error {
 	case <-ctx.Done():
 	}
 	draining.Store(true)
+	// Keep serving briefly while upstream readiness checks remove this instance.
+	if !demo {
+		time.Sleep(2 * time.Second)
+	}
 	shutdown, stop := context.WithTimeout(context.Background(), 10*time.Second)
 	defer stop()
-	return srv.Shutdown(shutdown)
+	err = srv.Shutdown(shutdown)
+	stopWorker()
+	<-workerDone
+	return err
 }

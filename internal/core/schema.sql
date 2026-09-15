@@ -35,3 +35,10 @@ CREATE TABLE IF NOT EXISTS audit (
  detail TEXT NOT NULL, created BIGINT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS audit_recent ON audit(tenant,created DESC);
+CREATE TABLE IF NOT EXISTS dispatch_context (
+ tenant TEXT NOT NULL, id TEXT NOT NULL, carrier TEXT NOT NULL,
+ PRIMARY KEY(tenant,id), FOREIGN KEY(tenant,id) REFERENCES deliveries(tenant,id)
+);
+CREATE TABLE IF NOT EXISTS transport_quarantine (
+ id TEXT PRIMARY KEY, payload TEXT NOT NULL, reason TEXT NOT NULL, created BIGINT NOT NULL
+);
