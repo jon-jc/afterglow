@@ -1,0 +1,8 @@
+.git
+data
+artifacts
+bin
+node_modules
+.env
+.terraform
+*.tfstate*

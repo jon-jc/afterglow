@@ -12,6 +12,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/jon-jc/afterglow/internal/console"
 	"github.com/jon-jc/afterglow/internal/core"
 	"github.com/jon-jc/afterglow/internal/httpapi"
 	"github.com/jon-jc/afterglow/internal/pipeline"
@@ -79,6 +80,7 @@ func run() error {
 	}
 	var draining atomic.Bool
 	api := &httpapi.Server{Store: store, Tenant: tenant, APIKey: os.Getenv("API_KEY"), Demo: demo, Ready: func() bool { return !draining.Load() }}
+	api.Static = console.Handler()
 	reg := prometheus.NewRegistry()
 	worker := pipeline.New(store, reg)
 	transport := env("TRANSPORT", "local")
@@ -89,6 +91,7 @@ func run() error {
 	workerCtx, stopWorker := context.WithCancel(context.Background())
 	defer stopWorker()
 	workerDone := make(chan struct{})
+	receiverDone := make(chan struct{})
 	var bus *pipeline.PubSub
 	if transport == "pubsub" {
 		bus, err = pipeline.NewPubSub(ctx, os.Getenv("GCP_PROJECT_ID"), env("PUBSUB_TOPIC", "afterglow-receipts"), env("PUBSUB_SUBSCRIPTION", "afterglow-reconciler"))
@@ -104,14 +107,18 @@ func run() error {
 		go func() { defer close(workerDone); worker.Run(workerCtx) }()
 		if bus != nil {
 			go func() {
+				defer close(receiverDone)
 				if e := bus.Receive(workerCtx, worker); e != nil && workerCtx.Err() == nil {
 					slog.Error("subscriber_failed", "error", e)
 					cancel()
 				}
 			}()
+		} else {
+			close(receiverDone)
 		}
 	} else {
 		close(workerDone)
+		close(receiverDone)
 	}
 	api.Metrics = promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	api.DemoHandler = httpapi.Demo(store, worker, tenant)
@@ -138,5 +145,6 @@ func run() error {
 	err = srv.Shutdown(shutdown)
 	stopWorker()
 	<-workerDone
+	<-receiverDone
 	return err
 }

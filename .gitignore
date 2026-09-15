@@ -1,5 +1,6 @@
 /data/
 /bin/
+/afterglow
 /artifacts/
 *.exe
 .env

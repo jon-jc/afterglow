@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: afterglow
+      POSTGRES_PASSWORD: local-demo-only
+      POSTGRES_DB: afterglow
+    ports: ['127.0.0.1:55432:5432']
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U afterglow']
+      interval: 3s
+      timeout: 3s
+      retries: 15
+  pubsub:
+    image: gcr.io/google.com/cloudsdktool/google-cloud-cli:emulators
+    command: gcloud beta emulators pubsub start --project=afterglow-local --host-port=0.0.0.0:8085
+    ports: ['127.0.0.1:8085:8085']
+  jaeger:
+    image: jaegertracing/all-in-one:1.76.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports: ['127.0.0.1:16686:16686', '127.0.0.1:4318:4318']
+volumes:
+  pgdata:
