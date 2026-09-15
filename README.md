@@ -18,7 +18,7 @@ This is an independent, production-oriented engineering demo with synthetic camp
 
 ## Run in 30 seconds
 
-Requires Go 1.25 or later.
+Requires Go 1.27 or later (aligned with the verified security scan and container build).
 
 ```sh
 go run ./cmd/afterglow
@@ -106,4 +106,6 @@ Open the [self-contained HTML field guide](internal/console/web/interview-notes.
 
 Read the [five-minute demo and engineering discussion guide](docs/interview.md). It covers three concrete examples, trade-offs, genuine-teamwork prompts and four questions for the hiring manager.
 
-Next production steps include a vendor-certified adapter, authenticated player evidence, real catalog synchronization, a complete campaign lifecycle, versioned deployment migrations, retention policies, credential rotation, and measured load/restore tests. The [operations guide](docs/operations.md) keeps those limits explicit.
+[Production release gates and deployment sequence](docs/production-readiness.md) document verified controls and remaining launch evidence. Protected mode requires PostgreSQL and a separately migrated schema.
+
+Next production steps include a vendor-certified adapter, authenticated player evidence, real catalog synchronization, a complete campaign lifecycle, staging migration/credential-rotation drills, retention policies, and measured load/restore tests. The [operations guide](docs/operations.md) keeps those limits explicit.

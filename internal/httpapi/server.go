@@ -19,19 +19,20 @@ import (
 )
 
 type Server struct {
-	Store       *core.Store
-	Tenant      string
-	APIKey      string
-	Demo        bool
-	Static      http.Handler
-	DemoHandler http.Handler
-	Metrics     http.Handler
-	Airports    http.Handler
-	Runtime     func() any
-	Ready       func() bool
-	mu          sync.Mutex
-	tokens      float64
-	last        time.Time
+	Store          *core.Store
+	Tenant         string
+	APIKey         string
+	PreviousAPIKey string
+	Demo           bool
+	Static         http.Handler
+	DemoHandler    http.Handler
+	Metrics        http.Handler
+	Airports       http.Handler
+	Runtime        func() any
+	Ready          func() bool
+	mu             sync.Mutex
+	tokens         float64
+	last           time.Time
 }
 
 func (s *Server) Handler() http.Handler {
@@ -150,7 +151,10 @@ func (s *Server) Handler() http.Handler {
 			if !s.Demo {
 				got := sha256.Sum256([]byte(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer ")))
 				want := sha256.Sum256([]byte(s.APIKey))
-				if s.APIKey == "" || !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || subtle.ConstantTimeCompare(got[:], want[:]) != 1 {
+				previous := sha256.Sum256([]byte(s.PreviousAPIKey))
+				currentMatch := subtle.ConstantTimeCompare(got[:], want[:])
+				previousMatch := subtle.ConstantTimeCompare(got[:], previous[:])
+				if s.APIKey == "" || !strings.HasPrefix(r.Header.Get("Authorization"), "Bearer ") || !(currentMatch == 1 || (len(s.PreviousAPIKey) >= 24 && previousMatch == 1)) {
 					problem(w, 401, "unauthorized")
 					return
 				}

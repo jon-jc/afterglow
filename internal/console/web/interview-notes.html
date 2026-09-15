@@ -1567,7 +1567,7 @@ released + late evidence → quarantine; no automatic charge</code></pre>
               </p>
             </div>
           </details>
-          <h3>5. Evidence must be visible</h3>
+          <h3>Release safety is now an explicit boundary</h3><p>Protected startup requires PostgreSQL, an explicit tenant and API credentials. Schema changes run through a separate migration command; application startup only checks the recorded version and checksum. Tests include a read-only PostgreSQL connection, so the runtime does not need DDL permissions to verify its schema.</p><p>Credential rotation can temporarily accept current and previous keys; removing the previous key ends the overlap. These controls improve deployment safety, but real rollout, restore, load and managed-service failure drills still need to happen. See the <a href="https://github.com/jon-jc/afterglow/blob/main/docs/production-readiness.md">production release gates</a>.</p><h3>5. Evidence must be visible</h3>
           <p>
             The console reads actual database state: held budget, settled spend,
             receipt decisions, attempt counts and audit history. Its overview
@@ -1933,7 +1933,7 @@ released + late evidence → quarantine; no automatic charge</code></pre>
               <p>
                 “I’d prioritize a real partner contract and trustworthy playback
                 evidence, then operational controls: complete campaign/catalog
-                lifecycle, versioned migrations, credential rotation, retention,
+                lifecycle, migration rollout rehearsals, credential rotation, retention,
                 alerting, backup restore drills and load testing against agreed
                 targets. I’d also review database permissions and fleet-wide
                 admission control.”

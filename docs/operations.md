@@ -41,7 +41,8 @@ Without this variable, the transport test uses Google's `pstest` gRPC service, n
 | `ADDR` | `127.0.0.1:8090` | HTTP listener. Container sets `0.0.0.0:8080`. |
 | `DATABASE_URL` | `data/afterglow.db` | SQLite filename or PostgreSQL DSN. |
 | `API_KEY` | none | At least 24 characters required outside demo mode. Send `Authorization: Bearer ...`. |
-| `TENANT_ID` | `demo` | Tenant selected by this API deployment's credential. |
+| `API_KEY_PREVIOUS` | none | Optional prior key, at least 24 characters; remove after the rotation window. |
+| `TENANT_ID` | `demo` locally | Explicit value required outside demo mode; tenant selected by the deployment credential. |
 | `ROLE` | `all` | `api`, `worker`, or `all`. |
 | `TRANSPORT` | `local` | `local` durable SQL queue, or `pubsub`. |
 | `GCP_PROJECT_ID` | none | Required for Pub/Sub. Uses Application Default Credentials. |
@@ -55,7 +56,7 @@ Without this variable, the transport test uses Google's `pstest` gRPC service, n
 
 The pull worker has minimum one instance and request-independent CPU. API and workers have separate service accounts; only workers publish/subscribe. No service is granted public invocation. The API invoker needs both an IAM identity token and the application's API credential. Workers share PostgreSQL; never put SQLite on Cloud Run's ephemeral filesystem.
 
-The database secret should contain a PostgreSQL DSN using `/cloudsql/PROJECT:REGION:INSTANCE` as its host socket. Store actual passwords only in Secret Manager. Before deploying, configure an appropriate Cloud SQL backup/PITR policy, connection limits, a migration owner and service-specific runtime database roles. Automatic startup DDL in this demo is serialized with a PostgreSQL advisory lock; a production rollout should run versioned migrations as a dedicated deployment step.
+The database secret should contain a PostgreSQL DSN using `/cloudsql/PROJECT:REGION:INSTANCE` as its host socket. Store actual passwords only in Secret Manager. Before deploying, configure an appropriate Cloud SQL backup/PITR policy, connection limits, a migration owner and service-specific runtime database roles. Protected mode now requires an explicit PostgreSQL target and only verifies schema metadata. Run `go run ./cmd/migrate` (or `/migrate` from the built image) with a migration-owner credential before deploying the runtime. Versioned metadata and normalized checksums gate startup; local demo mode still migrates automatically. See [production release gates](production-readiness.md).
 
 `terraform init` / `terraform validate` checks syntax and provider schema without deploying. No cloud plan or apply is included in the verification claim. Review costs and parameters before applying. Console fault controls are intentionally unavailable in protected mode; use the authenticated REST API.
 

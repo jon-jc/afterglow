@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
@@ -44,8 +45,12 @@ func run() error {
 	if demo && host != "127.0.0.1" && host != "localhost" && host != "::1" {
 		return core.ErrInvalid
 	}
-	if !demo && len(os.Getenv("API_KEY")) < 24 {
-		return core.ErrInvalid
+	if err = validateProduction(demo, os.Getenv("DATABASE_URL"), os.Getenv("TENANT_ID"), os.Getenv("API_KEY")); err != nil {
+		return err
+	}
+	previousKey := os.Getenv("API_KEY_PREVIOUS")
+	if previousKey != "" && len(previousKey) < 24 {
+		return fmt.Errorf("API_KEY_PREVIOUS must be empty or at least 24 characters")
 	}
 	dsn := env("DATABASE_URL", filepath.Join("data", "afterglow.db"))
 	if os.Getenv("DATABASE_URL") == "" {
@@ -64,12 +69,19 @@ func run() error {
 		defer stop()
 		_ = closeTelemetry(c)
 	}()
-	store, err := core.Open(ctx, dsn)
+	startup, stopStartup := context.WithTimeout(ctx, 15*time.Second)
+	defer stopStartup()
+	store, err := core.Open(startup, dsn)
 	if err != nil {
 		return err
 	}
 	defer store.DB.Close()
-	if err = store.Migrate(ctx); err != nil {
+	if demo {
+		err = store.Migrate(startup)
+	} else {
+		err = store.CheckSchema(startup)
+	}
+	if err != nil {
 		return err
 	}
 	tenant := env("TENANT_ID", "demo")
@@ -80,6 +92,7 @@ func run() error {
 	}
 	var draining atomic.Bool
 	api := &httpapi.Server{Store: store, Tenant: tenant, APIKey: os.Getenv("API_KEY"), Demo: demo, Ready: func() bool { return !draining.Load() }}
+	api.PreviousAPIKey = previousKey
 	api.Static = console.Handler()
 	api.Airports = httpapi.AirportCatalog(env("AIRPORT_SERVICE_URL", "http://127.0.0.1:8091"))
 	reg := prometheus.NewRegistry()
