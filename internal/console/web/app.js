@@ -24,6 +24,7 @@ const time = (n) =>
   });
 const title = (s) => s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const views = {
+  airports: "Airports",
   overview: "Overview",
   campaigns: "Campaigns",
   ledger: "Delivery ledger",
@@ -191,14 +192,14 @@ function network() {
         `<path class="map-line" d="M${pts[0].p} Q${(pts[0].p[0] + s.p[0]) / 2},${Math.min(pts[0].p[1], s.p[1]) - 40} ${s.p}"/>`,
     )
     .join("");
-  return `<section class="panel network-panel"><div class="panel-header"><div><h2>Network footprint</h2><p>Playback reconciliation across the demo network</p></div><span class="panel-tag">${pts.length} SCREENS / US</span></div><div class="map-wrap"><svg viewBox="0 0 650 295" role="img" aria-label="Illustrative US map of eight synthetic screens. Select a screen for its delivery details."><defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" class="map-grid"/></pattern></defs><rect width="650" height="295" fill="url(#grid)"/><path class="us-outline" d="${path}"/>${lines}${pts
+  return `<section class="panel network-panel"><div class="panel-header"><div><h2>Demo advertising screens</h2><p>Playback reconciliation across the demo network</p></div><span class="panel-tag">${pts.length} SCREENS / US</span></div><div class="map-wrap"><svg viewBox="0 0 650 295" role="img" aria-label="Illustrative US map of eight synthetic screens. Select a screen for its delivery details."><defs><pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" class="map-grid"/></pattern></defs><rect width="650" height="295" fill="url(#grid)"/><path class="us-outline" d="${path}"/>${lines}${pts
     .map((s) => {
       const label = s.id === "sea-02" ? "" : s.id.split("-")[0].toUpperCase();
       return `<g class="screen-dot" data-screen="${s.id}" tabindex="0" role="button" aria-label="${esc(s.name)}" transform="translate(${s.p})"><circle class="halo" r="12"/><circle class="core" r="3"/><text class="map-label" x="${s.id === "sea-01" ? -31 : 10}" y="${s.id === "sea-01" ? -10 : -6}">${label}</text></g>`;
     })
     .join(
       "",
-    )}</svg><div class="map-caption">ILLUSTRATIVE GEOGRAPHY · SYNTHETIC INVENTORY</div></div><div class="map-footer"><div class="legend"><span><i></i>Demo screen</span><span><i class="dim"></i>${new Set(pts.map((s) => s.market)).size} markets</span></div><span>Select a screen to inspect ↗</span></div></section>`;
+    )}</svg><div class="map-caption">ILLUSTRATIVE GEOGRAPHY · SYNTHETIC INVENTORY</div></div><div class="map-footer"><div class="legend"><span><i></i>Demo screen</span><span><i class="dim"></i>${new Set(pts.map((s) => s.market)).size} markets</span></div><a class="text-link" href="#airports">Explore all airports ↗</a></div></section>`;
 }
 function flow() {
   const c = state.counts,
@@ -414,6 +415,8 @@ function render() {
   const next = Object.hasOwn(views, location.hash.slice(1))
     ? location.hash.slice(1)
     : "overview";
+  if (next === "airports" && active === "airports" && $("#airport-explorer"))
+    return;
   if (focus?.id === "ledger-search" && next === active) {
     $("#ledger-results").innerHTML =
       ledgerTable(filtered()) +
@@ -439,7 +442,10 @@ function render() {
     else a.removeAttribute("aria-current");
   });
   $("#breadcrumb-view").textContent = views[active];
+  $(".synthetic-pill").textContent =
+    active === "airports" ? "AIRPORT REFERENCE DATA" : "SYNTHETIC DATA";
   $("#main").innerHTML = {
+    airports: airportExplorer.render,
     overview,
     campaigns,
     ledger,

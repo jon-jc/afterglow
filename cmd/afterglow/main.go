@@ -81,6 +81,7 @@ func run() error {
 	var draining atomic.Bool
 	api := &httpapi.Server{Store: store, Tenant: tenant, APIKey: os.Getenv("API_KEY"), Demo: demo, Ready: func() bool { return !draining.Load() }}
 	api.Static = console.Handler()
+	api.Airports = httpapi.AirportCatalog(env("AIRPORT_SERVICE_URL", "http://127.0.0.1:8091"))
 	reg := prometheus.NewRegistry()
 	worker := pipeline.New(store, reg)
 	transport := env("TRANSPORT", "local")

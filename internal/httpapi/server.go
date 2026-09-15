@@ -26,6 +26,7 @@ type Server struct {
 	Static      http.Handler
 	DemoHandler http.Handler
 	Metrics     http.Handler
+	Airports    http.Handler
 	Runtime     func() any
 	Ready       func() bool
 	mu          sync.Mutex
@@ -35,6 +36,13 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/airports", func(w http.ResponseWriter, r *http.Request) {
+		if s.Airports == nil {
+			problem(w, 503, "airport_service_not_configured")
+			return
+		}
+		s.Airports.ServeHTTP(w, r)
+	})
 	mux.HandleFunc("POST /api/v1/receipts/batch", s.acceptBatch)
 	mux.HandleFunc("GET /api/v1/runtime", func(w http.ResponseWriter, r *http.Request) {
 		if s.Runtime != nil {
