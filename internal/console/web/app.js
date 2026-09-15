@@ -41,6 +41,7 @@ let state = null,
   refreshing = false;
 async function request(path, body, headers = {}) {
   const response = await fetch(path, {
+    signal: AbortSignal.timeout(12000),
     method: body === undefined ? "GET" : "POST",
     headers: {
       ...(body !== undefined ? { "Content-Type": "application/json" } : {}),
@@ -48,12 +49,23 @@ async function request(path, body, headers = {}) {
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
-  const data = await response.json();
+  const data = await response.json().catch(() => null);
   if (!response.ok)
-    throw new Error(data.detail || `Request failed (${response.status})`);
+    throw new Error(
+      data?.detail || `Request failed (${response.status}). Please try again.`,
+    );
+  if (data === null)
+    throw new Error(
+      "The server returned an unreadable response. Please retry.",
+    );
   return data;
 }
 function toast(message, error = false) {
+  if ($("#detail-dialog").open) {
+    $("#dialog-notice").textContent = message;
+    $("#dialog-notice").className = error ? "form-error" : "";
+    return;
+  }
   const el = $("#toast");
   el.textContent = message;
   el.className = `toast show${error ? " error" : ""}`;
@@ -226,6 +238,11 @@ function campaignsTable() {
   return `<section class="panel"><div class="panel-header"><div><h2>Campaign pacing</h2><p>Settled and held against a hard budget cap</p></div><a href="#campaigns" class="button quiet">All campaigns ↗</a></div><div class="table-wrap"><table><thead><tr><th>CAMPAIGN</th><th>COMMITTED / BUDGET</th><th>STATE</th></tr></thead><tbody>${state.campaigns.map((c, i) => `<tr><td><div class="campaign-name"><span class="campaign-mark ${i === 1 ? "blue" : i === 2 ? "purple" : ""}">${["C", "N", "S"][i] || "A"}</span><div>${esc(c.name.split(" / ")[0])}<small>${esc(c.name.split(" / ")[1])}</small></div></div></td><td>${money(c.spent_micros + c.reserved_micros)} <span class="muted">/ ${money(c.budget_micros)}</span>${progress(c)}</td><td><span class="badge">${c.spent_micros + c.reserved_micros === c.budget_micros ? "At cap" : "Active"}</span></td></tr>`).join("")}</tbody></table></div><div class="table-foot"><span>Lime: settled · Amber: held</span><span>USD micros · No floating point</span></div></section>`;
 }
 function ledgerTable(data, compact = false) {
+  if (
+    !data.length &&
+    (search || (!compact && active === "ledger" && filter !== "all"))
+  )
+    return '<div class="empty"><strong>No matching receipts.</strong>Try a different search or clear your filters.</div>';
   if (!data.length)
     return `<div class="empty"><strong>${active === "recovery" ? "Nothing needs recovery." : "Your next play starts here."}</strong>${active === "recovery" ? "Run the schema or retry scenario in the failure lab to inspect a rejected delivery." : "Simulate traffic to create real reservations and reconcile playback receipts."}</div>`;
   return `<div class="table-wrap"><table><thead><tr><th>RECEIPT / SCREEN</th>${compact ? "" : "<th>RESERVATION</th><th>PLAYED AT</th>"}<th>DECISION</th><th>${compact ? "RECEIVED" : "ATTEMPTS"}</th></tr></thead><tbody>${data.map((d) => `<tr><td><button class="text-link mono" data-delivery="${d.id}">${esc(d.event_id.slice(0, 8))}<span class="muted">… ↗</span></button><div class="muted" style="font-size:9px;margin-top:5px">${esc(d.screen_id.toUpperCase())}</div></td>${compact ? "" : `<td class="mono muted">${esc(d.reservation_id.slice(0, 12))}…</td><td class="mono">${time(d.played_at)}</td>`}<td>${badge(d.status)}</td><td class="mono muted">${compact ? time(d.received_at) : d.attempts}</td></tr>`).join("")}</tbody></table></div>`;
@@ -394,12 +411,33 @@ function architecture() {
 function render() {
   if (!state) return;
   const focus = document.activeElement;
-  if (focus?.id === "ledger-search") return;
+  const next = Object.hasOwn(views, location.hash.slice(1))
+    ? location.hash.slice(1)
+    : "overview";
+  if (focus?.id === "ledger-search" && next === active) {
+    $("#ledger-results").innerHTML =
+      ledgerTable(filtered()) +
+      `<div class="table-foot">Newest 100 receipts · ${filtered().length} shown</div>`;
+    return;
+  }
+  const focusedAttribute = [
+    "data-filter",
+    "data-action",
+    "data-delivery",
+    "data-proof",
+    "data-screen",
+  ].find((a) => focus?.hasAttribute(a));
+  const focusSelector =
+    focusedAttribute && $("#main").contains(focus)
+      ? `[${focusedAttribute}="${CSS.escape(focus.getAttribute(focusedAttribute))}"]`
+      : null;
   active = location.hash.slice(1);
-  if (!views[active]) active = "overview";
-  document
-    .querySelectorAll("[data-view]")
-    .forEach((a) => a.classList.toggle("active", a.dataset.view === active));
+  if (!Object.hasOwn(views, active)) active = "overview";
+  document.querySelectorAll("[data-view]").forEach((a) => {
+    a.classList.toggle("active", a.dataset.view === active);
+    if (a.dataset.view === active) a.setAttribute("aria-current", "page");
+    else a.removeAttribute("aria-current");
+  });
   $("#breadcrumb-view").textContent = views[active];
   $("#main").innerHTML = {
     overview,
@@ -409,13 +447,21 @@ function render() {
     lab,
     architecture,
   }[active]();
-  if (!runtime.demo)
-    document
-      .querySelectorAll("[data-action]")
-      .forEach((b) => (b.disabled = true));
+  syncActions();
+  if (focusSelector)
+    ($(focusSelector) || $("#main")).focus({ preventScroll: true });
+}
+function syncActions() {
+  document.querySelectorAll("[data-action]").forEach((b) => {
+    b.disabled = busy || !runtime.demo;
+    b.setAttribute("aria-busy", String(busy));
+  });
 }
 function openDialog(html) {
+  $("#dialog-notice").textContent = "";
   $("#dialog-content").innerHTML = html;
+  const heading = $("h2", $("#dialog-content"));
+  if (heading) heading.id = "dialog-title";
   $("#detail-dialog").showModal();
 }
 function details(id) {
@@ -429,10 +475,11 @@ function details(id) {
 async function scenario(kind) {
   if (busy) return;
   busy = true;
+  syncActions();
   try {
     if (kind === "reserve") {
       openDialog(
-        `<div class="dialog-eyebrow">CAMPAIGN OPERATIONS</div><h2>Reserve a play.</h2><form id="reserve-form"><label>Campaign<select name="campaign">${state.campaigns.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></label><label>Screen<select name="screen">${state.screens.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></label><label>Price in USD<input name="price" value="1.50" inputmode="decimal" pattern="[0-9]+(\.[0-9]{1,2})?" required></label><button class="button primary" type="submit">Reserve budget →</button></form><p>The hold expires 15 minutes from now, followed by a 15-minute receipt grace period.</p>`,
+        `<div class="dialog-eyebrow">CAMPAIGN OPERATIONS</div><h2>Reserve a play.</h2><form id="reserve-form"><label>Campaign<select name="campaign">${state.campaigns.map((c) => `<option value="${c.id}">${esc(c.name)}</option>`).join("")}</select></label><label>Screen<select name="screen">${state.screens.map((s) => `<option value="${s.id}">${esc(s.name)}</option>`).join("")}</select></label><label>Price in USD<input name="price" value="1.50" inputmode="decimal" pattern="[0-9]+([.][0-9]{1,2})?" required></label><p id="reserve-error" class="form-error" role="alert"></p><button class="button primary" type="submit">Reserve budget →</button></form><p>The hold expires 15 minutes from now, followed by a 15-minute receipt grace period.</p>`,
       );
       return;
     }
@@ -459,6 +506,7 @@ async function scenario(kind) {
     toast(e.message, true);
   } finally {
     busy = false;
+    syncActions();
   }
 }
 document.addEventListener("click", async (event) => {
@@ -537,8 +585,10 @@ document.addEventListener("submit", async (e) => {
   e.preventDefault();
   const form = e.target,
     b = $("button", form);
+  if (b.disabled) return;
   try {
     b.disabled = true;
+    $("#reserve-error", form).textContent = "";
     const fd = new FormData(form),
       raw = String(fd.get("price"));
     if (!/^\d+(\.\d{1,2})?$/.test(raw))
@@ -549,20 +599,33 @@ document.addEventListener("submit", async (e) => {
     const cost = Number(whole) * 1000000 + Number(cents.padEnd(2, "0")) * 10000;
     if (!Number.isSafeInteger(cost) || cost <= 0 || cost > 1000000000)
       throw new Error("Choose a price from $0.01 to $1,000.");
-    await request(
-      "/api/v1/reservations",
-      {
-        campaign_id: fd.get("campaign"),
-        screen_id: fd.get("screen"),
-        cost_micros: cost,
-      },
-      { "Idempotency-Key": crypto.randomUUID() },
-    );
-    $("#detail-dialog").close();
+    const payload = {
+      campaign_id: fd.get("campaign"),
+      screen_id: fd.get("screen"),
+      cost_micros: cost,
+    };
+    // An ambiguous response must retry the same operation, not create another hold.
+    const fingerprint = JSON.stringify(payload);
+    if (form.dataset.fingerprint !== fingerprint) {
+      form.dataset.fingerprint = fingerprint;
+      form.dataset.requestKey = crypto.randomUUID();
+    }
+    await request("/api/v1/reservations", payload, {
+      "Idempotency-Key": form.dataset.requestKey,
+    });
+    if (form.isConnected) $("#detail-dialog").close();
     toast("Budget reserved. Record its playback from the reservations table.");
     await refresh();
   } catch (err) {
-    toast(err.message, true);
+    if (form.isConnected) {
+      $("#reserve-error", form).textContent =
+        `${err.message} Retrying the unchanged form uses the same request key.`;
+    } else {
+      toast(
+        `${err.message} Check reservations before creating another hold.`,
+        true,
+      );
+    }
   } finally {
     b.disabled = false;
   }
@@ -581,6 +644,10 @@ $("#detail-dialog").addEventListener("click", (e) => {
   }
 });
 $("#refresh").addEventListener("click", refresh);
+$(".skip-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  $("#main").focus();
+});
 window.addEventListener("hashchange", () => {
   search = "";
   filter = "all";
