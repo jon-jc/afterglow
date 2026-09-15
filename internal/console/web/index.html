@@ -10,6 +10,7 @@
     <script src="/app.js" defer></script>
   </head>
   <body>
+    <a class="skip-link" href="#main">Skip to content</a>
     <aside class="sidebar">
       <a href="#overview" class="brand"
         ><span class="brand-symbol">a<span>•</span></span
@@ -41,9 +42,14 @@
         ><a href="#architecture" data-view="architecture"
           ><span>◇</span>Architecture</a
         >
+        <a
+          href="/interview-notes.html"
+          aria-label="Interview field guide"
+          title="Interview field guide"
+          ><span aria-hidden="true">▥</span>Interview guide</a
+        >
       </nav>
       <div class="sidebar-bottom">
-        <a href="/interview-notes.html" class="button small" style="margin-bottom:14px;width:100%">Interview field guide ↗</a>
         <div class="environment">
           <span class="status-dot"></span
           ><span
@@ -86,8 +92,9 @@
       </footer>
     </div>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
-    <dialog id="detail-dialog">
+    <dialog id="detail-dialog" aria-labelledby="dialog-title">
       <div id="dialog-content"></div>
+      <p id="dialog-notice" role="status" aria-live="polite"></p>
       <button id="close-dialog" class="dialog-close" aria-label="Close dialog">
         ×
       </button>
