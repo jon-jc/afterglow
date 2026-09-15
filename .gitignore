@@ -1,0 +1,9 @@
+/data/
+/bin/
+/artifacts/
+*.exe
+.env
+node_modules/
+*.tfstate*
+.terraform/
+coverage.out
