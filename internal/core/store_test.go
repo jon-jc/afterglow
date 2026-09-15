@@ -261,3 +261,28 @@ func TestDurableRestart(t *testing.T) {
 		t.Fatal("lost accepted receipt")
 	}
 }
+
+func TestAuditWriteFailureRollsBackCharge(t *testing.T) {
+	s, tenant := fixture(t)
+	if s.Postgres {
+		t.Skip("SQLite fault injection; invariants also exercised on Postgres")
+	}
+	r := hold(t, s, tenant)
+	id := accept(t, s, tenant, proof(r))
+	if _, e := s.DB.Exec(`CREATE TRIGGER reject_audit BEFORE INSERT ON audit WHEN NEW.kind='settled' BEGIN SELECT RAISE(ABORT,'injected audit failure'); END`); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := s.Process(context.Background(), tenant, id); e == nil {
+		t.Fatal("fault did not trigger")
+	}
+	v := snap(t, s, tenant)
+	if v.Campaigns[0].Spent != 0 || v.Reservations[0].State != "held" || v.Deliveries[0].Status != "accepted" {
+		t.Fatal("partial commit")
+	}
+	if _, e := s.DB.Exec(`DROP TRIGGER reject_audit`); e != nil {
+		t.Fatal(e)
+	}
+	if _, e := s.Process(context.Background(), tenant, id); e != nil {
+		t.Fatal(e)
+	}
+}

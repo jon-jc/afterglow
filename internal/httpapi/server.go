@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/jon-jc/afterglow/internal/core"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 type Server struct {
@@ -23,6 +25,8 @@ type Server struct {
 	Demo        bool
 	Static      http.Handler
 	DemoHandler http.Handler
+	Metrics     http.Handler
+	Runtime     func() any
 	Ready       func() bool
 	mu          sync.Mutex
 	tokens      float64
@@ -31,6 +35,27 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("GET /api/v1/runtime", func(w http.ResponseWriter, r *http.Request) {
+		if s.Runtime != nil {
+			respond(w, 200, s.Runtime())
+			return
+		}
+		respond(w, 200, map[string]string{"transport": "local"})
+	})
+	mux.HandleFunc("GET /api/v1/metrics", func(w http.ResponseWriter, r *http.Request) {
+		if s.Metrics != nil {
+			s.Metrics.ServeHTTP(w, r)
+			return
+		}
+		problem(w, 404, "not_found")
+	})
+	mux.HandleFunc("POST /api/v1/deliveries/{id}/replay", func(w http.ResponseWriter, r *http.Request) {
+		if err := s.Store.Replay(r.Context(), s.Tenant, r.PathValue("id")); err != nil {
+			fail(w, err)
+			return
+		}
+		respond(w, 202, map[string]string{"status": "requeued"})
+	})
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, r *http.Request) { respond(w, 200, map[string]string{"status": "alive"}) })
 	mux.HandleFunc("GET /readyz", func(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), time.Second)
@@ -145,6 +170,9 @@ func (s *Server) Handler() http.Handler {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
+		ctx = otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
+		ctx, span := otel.Tracer("afterglow").Start(ctx, "http.request")
+		defer span.End()
 		mux.ServeHTTP(w, r.WithContext(ctx))
 		slog.Debug("http_request", "request_id", id, "method", r.Method, "elapsed_ms", time.Since(started).Milliseconds())
 	})
