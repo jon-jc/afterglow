@@ -77,6 +77,7 @@ go test ./...
 go vet ./...
 go test -race -count=1 ./...   # supported compiler/toolchain required
 node scripts/smoke.mjs        # isolated server + database, Node 22+
+go run ./cmd/rehearsal        # requires REHEARSAL_DATABASE_URL: local PostgreSQL test DB
 ```
 
 Set `TEST_DATABASE_URL` to an isolated PostgreSQL database to run core invariants against PostgreSQL. Set `TEST_PUBSUB_EMULATOR_HOST` to run the transport test against the official emulator. Otherwise, it uses Google's `pstest` gRPC server.
@@ -101,6 +102,8 @@ docs                Design, research, operations and interview walkthrough
 ```
 
 ## Interview walkthrough
+
+The [chosen staging route](docs/staging-route.md) includes a measured PostgreSQL recovery rehearsal and explains the remaining cloud validation gates.
 
 Open the [self-contained HTML field guide](internal/console/web/interview-notes.html), or visit **http://127.0.0.1:8090/interview-notes.html** while the service is running. It connects Fluxgate to Afterglow with speaking notes, architecture explanations, expandable technical answers, a demo script and a rehearsal checklist.
 

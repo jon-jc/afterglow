@@ -1,0 +1,26 @@
+{
+  "backlog_preserved_on_reopen": 240,
+  "clients": 12,
+  "counts": {
+    "duplicate": 120,
+    "settled": 120
+  },
+  "drain_seconds": 4.66331659,
+  "held_micros": 0,
+  "http_attempts": 378,
+  "ingest_seconds": 11.166787617,
+  "logical_operations": 252,
+  "operation_latency_including_admission_retries_ms": {
+    "p50": 18.272,
+    "p95": 2004.738,
+    "p99": 3005.038
+  },
+  "passed": true,
+  "plays": 120,
+  "profile": "local PostgreSQL + authenticated loopback HTTP + SQL transport (not managed Pub/Sub)",
+  "rate_limited_responses": 126,
+  "recorded_at": "2026-09-15T21:48:47.937177019Z",
+  "redelivered_outbox_rows": 1,
+  "spent_micros": 6000000,
+  "workers": 4
+}
