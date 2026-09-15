@@ -24,7 +24,7 @@ provider "google-beta" {
 variable "project_id" { type = string }
 variable "region" {
   type    = string
-  default = "us-central1"
+  default = "us-west1"
 }
 variable "image" {
   type        = string
