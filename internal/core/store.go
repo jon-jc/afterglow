@@ -64,12 +64,30 @@ func (s *Store) Migrate(ctx context.Context) error {
 			return err
 		}
 	}
+	if _, err = tx.ExecContext(ctx, `CREATE TABLE IF NOT EXISTS schema_migrations (version BIGINT PRIMARY KEY, checksum TEXT NOT NULL, applied_at BIGINT NOT NULL)`); err != nil {
+		return err
+	}
+	var version int64
+	var checksum string
+	err = tx.QueryRowContext(ctx, `SELECT version,checksum FROM schema_migrations ORDER BY version DESC LIMIT 1`).Scan(&version, &checksum)
+	if err == nil {
+		if version != schemaVersion || checksum != schemaChecksum() {
+			return ErrSchemaMismatch
+		}
+		return tx.Commit()
+	}
+	if !errors.Is(err, sql.ErrNoRows) {
+		return err
+	}
 	for _, q := range strings.Split(schema, ";") {
 		if strings.TrimSpace(q) != "" {
 			if _, err = tx.ExecContext(ctx, q); err != nil {
 				return err
 			}
 		}
+	}
+	if _, err = tx.ExecContext(ctx, `INSERT INTO schema_migrations(version,checksum,applied_at) VALUES($1,$2,$3)`, schemaVersion, schemaChecksum(), millis()); err != nil {
+		return err
 	}
 	return tx.Commit()
 }
