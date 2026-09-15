@@ -1,0 +1,154 @@
+openapi: 3.1.0
+info:
+  title: Afterglow Reconciliation API
+  version: 1.0.0
+  description: Synthetic DOOH reservation and playback contract. Not a Vistar API implementation. Money is integer USD micros. Tenant comes from the deployment credential. Demo mode is loopback-only and bypasses bearer authentication.
+servers:
+  - url: http://127.0.0.1:8090
+security:
+  - bearer: []
+paths:
+  /healthz:
+    get:
+      operationId: getLiveness
+      security: []
+      summary: Process liveness
+      responses:
+        '200': {description: Process is alive}
+  /readyz:
+    get:
+      operationId: getReadiness
+      security: []
+      summary: Database connectivity and shutdown readiness
+      responses:
+        '200': {description: Accepting work}
+        '503': {description: Not ready}
+  /api/v1/reservations:
+    post:
+      operationId: reservePlayback
+      summary: Hold budget for one screen playback
+      parameters:
+        - in: header
+          name: Idempotency-Key
+          required: true
+          schema: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [campaign_id, screen_id, cost_micros]
+              properties:
+                campaign_id: {type: string}
+                screen_id: {type: string}
+                cost_micros: {type: integer, minimum: 1, maximum: 1000000000}
+      responses:
+        '201':
+          description: Budget held. Reservation play window lasts 15 minutes.
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Reservation'}
+        '200': {description: Existing reservation replayed for the same normalized payload and key. Includes Idempotent-Replayed header.}
+        '409': {description: Insufficient remaining budget or idempotency key conflicts with prior content}
+        '404': {description: Unknown campaign or screen}
+        '422': {description: Invalid IDs or cost}
+        '400': {description: Malformed or unknown JSON fields}
+        '401': {description: Invalid credential}
+        '415': {description: JSON content type required}
+        '429': {description: Local mutation rate limit reached; Retry-After provided}
+        '503': {description: Capacity or dependency unavailable}
+  /api/v1/receipts:
+    post:
+      operationId: acceptPlaybackReceipt
+      summary: Persist a playback receipt and dispatch intent atomically
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Receipt'}
+      responses:
+        '202':
+          description: Receipt and outbox committed. Not a promise of broker delivery or settlement. Event ID replay returns the existing delivery ID.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, replayed, durability]
+                properties:
+                  id: {type: string}
+                  replayed: {type: boolean}
+                  durability: {const: database_and_outbox_committed}
+        '409': {description: Event ID reused with different normalized content}
+        '422': {description: Invalid identifiers}
+        '400': {description: Invalid or oversized JSON}
+        '401': {description: Invalid credential}
+        '415': {description: JSON content type required}
+        '429': {description: Rate limited}
+        '503': {description: Capacity or database unavailable}
+  /api/v1/deliveries/{id}/replay:
+    post:
+      operationId: replayDelivery
+      summary: Requeue immutable evidence after investigating the cause
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string}
+      responses:
+        '202': {description: Quarantined or failed receipt requeued; normal validation still applies}
+        '409': {description: Delivery not eligible for replay or not visible to this tenant}
+        '401': {description: Invalid credential}
+        '503': {description: Database unavailable}
+  /api/v1/snapshot:
+    get:
+      operationId: getOperationsSnapshot
+      summary: Consistent tenant-scoped operations snapshot
+      responses:
+        '200':
+          description: Campaign balances, shared screen inventory, newest 100 reservations and receipts, newest 80 audit records, all-time status counts and oldest_pending_ms. Timestamps are Unix milliseconds. PostgreSQL reads use a repeatable-read transaction.
+        '401': {description: Invalid credential}
+        '503': {description: Database unavailable}
+  /api/v1/runtime:
+    get:
+      operationId: getRuntime
+      summary: Execution mode, storage, role, paused state and breaker state
+      responses:
+        '200': {description: Runtime configuration without credentials}
+        '401': {description: Invalid credential}
+  /api/v1/metrics:
+    get:
+      operationId: getPrometheusMetrics
+      summary: Prometheus counters and processing duration
+      responses:
+        '200': {description: Prometheus exposition format}
+        '401': {description: Invalid credential}
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+  schemas:
+    Reservation:
+      type: object
+      properties:
+        id: {type: string}
+        campaign_id: {type: string}
+        screen_id: {type: string}
+        cost_micros: {type: integer}
+        state: {type: string, enum: [held, settled, released]}
+        created_at: {type: integer, description: Unix milliseconds}
+        expires_at: {type: integer, description: End of play window; funds released after additional 15-minute receipt grace}
+    Receipt:
+      type: object
+      additionalProperties: false
+      required: [event_id, reservation_id, screen_id]
+      description: Only identifiers are synchronously validated. Unsupported version, missing or invalid play time or duration are durably accepted and then quarantined by the consumer. This separation preserves partner evidence.
+      properties:
+        schema_version: {type: integer, examples: [1]}
+        event_id: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        reservation_id: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        screen_id: {type: string, pattern: '^[A-Za-z0-9_-]{1,100}$'}
+        played_at: {type: integer, description: Unix milliseconds; must fall inside reservation window}
+        duration_ms: {type: integer, description: Consumer accepts 1000 through 120000 inclusive}

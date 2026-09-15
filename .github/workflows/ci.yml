@@ -32,3 +32,16 @@ jobs:
         env:
           TEST_DATABASE_URL: postgres://afterglow:local-test-only@localhost:5432/afterglow?sslmode=disable
       - run: go build ./cmd/afterglow
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node scripts/smoke.mjs
+  terraform:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.12.2
+      - run: terraform -chdir=deploy/terraform init -backend=false -input=false
+      - run: terraform -chdir=deploy/terraform validate
