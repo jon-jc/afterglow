@@ -40,7 +40,7 @@ Open **http://127.0.0.1:8090** and choose **Live proof**. The local run uses per
 
 **Live proof:** choose **Live proof** for a six-stage, resumable run against the Go API: reserve, accept, retry, reconcile, correct, and verify. Each run uses two cents of synthetic budget and exports the observed evidence.
 
-**Partner intake:** reserve a play in Campaigns, then open **Partner intake** to send a mixed batch to the Go API. Inspect per-item results, retry unchanged identities, and follow asynchronous decisions in the ledger. The optional airport reference service remains a standalone backend experiment; its console section has been removed.
+**Partner intake:** choose one of six scenarios and click **Load example**. It prepares a $0.01 synthetic reservation automatically; repeated loads reuse the unsent hold. Click **Send batch** to exercise valid playback, partial success, duplicate plays, event replay, unsupported schemas, or invalid play windows against the real Go API. Inspect per-item results, retry unchanged identities, and follow asynchronous decisions in the ledger. The optional airport reference service remains a standalone backend experiment; its console section has been removed.
 
 For PostgreSQL plus the official Pub/Sub emulator, see [operations](docs/operations.md). `TRANSPORT=pubsub` uses the Google Go v2 client. The local transport never claims to be Pub/Sub.
 
