@@ -25,6 +25,7 @@ const footTraffic = (() => {
     }
   } catch { /* Storage may be unavailable; the page still works in memory. */ }
   function remember() {
+    if (!demoSession.active()) return;
     try { sessionStorage.setItem(storageKey, JSON.stringify({ selected, attempts })); } catch {}
   }
   const path = route => `/api/v1/foot-traffic/${route}?scenario=${encodeURIComponent(selected)}`;

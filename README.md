@@ -30,6 +30,8 @@ Double-click **Stop Afterglow.cmd** to stop the local app. Your saved data stays
 
 The launcher is for the local SQLite demo. It explicitly selects local transport and does not use deployment database credentials. To rebuild after editing code, stop and start again.
 
+**Fresh run:** click **Clear demo data** in the top bar, then **Clear all demo data**. This removes receipts, reservations, queue and audit history, and all foot-traffic samples; restores available budgets; clears saved browser runs; and resumes the worker without injected failures. Campaign definitions and screens remain ready to use. The operation is atomic and available only in the single-process local SQLite demo. It cannot be undone. Process logs and monitoring counters retain their diagnostic history.
+
 ## Run from a terminal
 
 Requires Go 1.27 or later (aligned with the verified security scan and container build).

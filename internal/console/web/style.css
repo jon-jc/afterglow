@@ -2585,3 +2585,15 @@ td .text-link.mono {
     font-size: 11px;
   }
 }
+
+.reset-demo-button { white-space: nowrap; }
+#reset-demo-dialog { max-width: 550px; width: calc(100% - 32px); }
+#reset-demo-dialog .reset-demo-list { color: var(--muted); padding-left: 20px; font-size: 14px; line-height: 1.8; }
+#reset-demo-notice { min-height: 22px; color: var(--amber, #f3c27d); }
+.reset-demo-confirm { background: #863f36; border-color: #b26b5d; color: #fff; }
+.reset-demo-confirm:hover:not(:disabled) { background: #9c4c40; }
+@media (max-width: 600px) {
+  .topbar-right { flex-wrap: wrap; }
+  .reset-demo-button { font-size: 11px; padding: 8px; }
+  #reset-demo-dialog .dialog-actions { flex-wrap: wrap; }
+}

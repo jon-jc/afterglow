@@ -31,6 +31,9 @@ type Server struct {
 	FootTraffic    http.Handler
 	Runtime        func() any
 	Ready          func() bool
+	ResetDemo      func(context.Context) (string, error)
+	DemoGeneration string
+	demoGate       sync.RWMutex
 	mu             sync.Mutex
 	tokens         float64
 	last           time.Time
@@ -38,6 +41,30 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("POST /api/demo/reset", func(w http.ResponseWriter, r *http.Request) {
+		if !s.Demo || s.ResetDemo == nil {
+			problem(w, 404, "not_found")
+			return
+		}
+		var in struct {
+			Confirm bool `json:"confirm"`
+		}
+		if !decode(w, r, &in) {
+			return
+		}
+		if !in.Confirm {
+			problem(w, 422, "confirm_demo_data_reset")
+			return
+		}
+		generation, err := s.ResetDemo(r.Context())
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		s.DemoGeneration = generation
+		w.Header().Set("X-Demo-Generation", generation)
+		respond(w, 200, map[string]any{"cleared": true, "generation": generation})
+	})
 	mux.HandleFunc("/api/v1/foot-traffic/", func(w http.ResponseWriter, r *http.Request) {
 		if s.FootTraffic == nil {
 			problem(w, 503, "foot_traffic_service_not_configured")
@@ -209,6 +236,22 @@ func (s *Server) Handler() http.Handler {
 		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
+		if s.Demo && s.ResetDemo != nil && strings.HasPrefix(r.URL.Path, "/api/") {
+			// Existing requests finish before resetting. New requests see the new
+			// generation; stale browser mutations cannot recreate old work.
+			if r.Method == "POST" && r.URL.Path == "/api/demo/reset" {
+				s.demoGate.Lock()
+				defer s.demoGate.Unlock()
+			} else {
+				s.demoGate.RLock()
+				defer s.demoGate.RUnlock()
+			}
+			w.Header().Set("X-Demo-Generation", s.DemoGeneration)
+			if g := r.Header.Get("X-Demo-Generation"); r.Method != "GET" && r.Method != "HEAD" && g != "" && g != s.DemoGeneration {
+				problem(w, 409, "demo_was_reset_reload_page")
+				return
+			}
+		}
 		ctx = otel.GetTextMapPropagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
 		ctx, span := otel.Tracer("afterglow").Start(ctx, "http.request")
 		defer span.End()
