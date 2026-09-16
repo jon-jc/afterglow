@@ -45,6 +45,7 @@ let state = null,
   livePaused = false,
   lastUpdated = null,
   connectionLost = false,
+  overviewProofOpen = false,
   ledgerPage = 0,
   ledgerSort = "newest";
 async function request(path, body, headers = {}) {
@@ -133,6 +134,13 @@ $("#live-toggle").addEventListener("click", () => {
   $("#live-toggle").setAttribute("aria-label", $("#live-toggle").title);
   freshness();
   if (!livePaused) refresh();
+});
+document.addEventListener("click", (e) => {
+  if (e.target.closest("[data-overview-proof]") && runtime.demo) {
+    overviewProofOpen = true;
+    render();
+    $("#inline-proof [data-proof-run]")?.click();
+  }
 });
 document.addEventListener("change", (e) => {
   if (e.target.id === "ledger-sort") {
@@ -328,8 +336,9 @@ function overview() {
     heading(
       "Every play. Accounted for.",
       "A clear view of campaign delivery, from reservation to reconciliation.",
-      `<a href="#lab" class="button">⌘ Failure lab</a><a href="#proof" class="button primary">◎ Run live proof</a>`,
+      `<a href="#lab" class="button">⌘ Failure lab</a><button class="button primary" data-overview-proof ${!runtime.demo ? "disabled" : ""}>◎ Run live proof</button>`,
     ) +
+    (overviewProofOpen ? integrationProof.renderInline("") : "") +
     metrics() +
     `<div class="overview-next"><span><strong>${runtime.paused ? "Dispatcher paused" : (state.counts.accepted || 0) > 0 ? `${num(state.counts.accepted)} receipts awaiting a decision` : "Delivery queue is clear"}</strong> · ${(state.counts.quarantined || 0) + (state.counts.failed || 0) > 0 ? `${num((state.counts.quarantined || 0) + (state.counts.failed || 0))} exceptions recorded. Inspect the latest evidence and choose the next step.` : "Start a partner batch or verify the integration end to end."}</span><a href="#${runtime.paused ? "lab" : (state.counts.quarantined || 0) + (state.counts.failed || 0) > 0 ? "recovery" : "intake"}">${runtime.paused ? "Open controls" : (state.counts.quarantined || 0) + (state.counts.failed || 0) > 0 ? "Review exceptions" : "Open intake"} ↗</a></div>` +
     `<div class="network-grid">${network()}${flow()}</div><div class="bottom-grid">${campaignsTable()}${recent()}</div>`
