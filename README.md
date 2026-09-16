@@ -28,6 +28,8 @@ Open **http://127.0.0.1:8090** and click **Simulate traffic**. The local run use
 
 **GoLand:** open this folder, let the Go module index, and run the checked-in **Afterglow** configuration. Set breakpoints in `Reserve`, `Accept`, and `Process`. Windows users can also run `./scripts/start.ps1`.
 
+**Live proof:** choose **Live proof** for a six-stage, resumable run against the Go API: reserve, accept, retry, reconcile, correct, and verify. Each run uses two cents of synthetic budget and exports the observed evidence.
+
 **Partner intake:** reserve a play in Campaigns, then open **Partner intake** to send a mixed batch to the Go API. Inspect per-item results, retry unchanged identities, and follow asynchronous decisions in the ledger. The optional airport reference service remains a standalone backend experiment; its console section has been removed.
 
 For PostgreSQL plus the official Pub/Sub emulator, see [operations](docs/operations.md). `TRANSPORT=pubsub` uses the Google Go v2 client. The local transport never claims to be Pub/Sub.
@@ -105,7 +107,7 @@ docs                Design, research, operations and interview walkthrough
 
 The [chosen staging route](docs/staging-route.md) includes a measured PostgreSQL recovery rehearsal and explains the remaining cloud validation gates.
 
-Open the [self-contained HTML field guide](internal/console/web/interview-notes.html), or visit **http://127.0.0.1:8090/interview-notes.html** while the service is running. It connects Fluxgate to Afterglow with speaking notes, architecture explanations, expandable technical answers, a demo script and a rehearsal checklist.
+Open the [standalone HTML study guide](docs/interview-notes.html) directly as a local file. It is not embedded in or served by the product. It connects Fluxgate to Afterglow with speaking notes, architecture explanations, expandable technical answers, a demo script and a rehearsal checklist.
 
 Read the [five-minute demo and engineering discussion guide](docs/interview.md). It covers three concrete examples, trade-offs, genuine-teamwork prompts and four questions for the hiring manager.
 
