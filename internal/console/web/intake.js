@@ -1,5 +1,35 @@
 "use strict";
 const partnerIntake = (() => {
+  const examples = {
+    partial: [
+      "Partial success",
+      "Two events for one play plus a malformed item. Expect HTTP 207, then one settlement and one duplicate.",
+    ],
+    clean: [
+      "Valid playback",
+      "One valid receipt. Expect HTTP 202, followed by settlement.",
+    ],
+    duplicate: [
+      "Different IDs, same play",
+      "Five event IDs report one reservation. Expect one settlement and four duplicates.",
+    ],
+    replay: [
+      "Same event repeated",
+      "The identical event appears twice. Expect the second item to replay the first receipt identity.",
+    ],
+    schema: [
+      "Unsupported schema",
+      "Schema v99 is accepted durably, then quarantined by the worker. No settlement.",
+    ],
+    window: [
+      "Outside the play window",
+      "Playback predates the reservation. Expect durable acceptance, then quarantine.",
+    ],
+  };
+  let exampleKind = "partial",
+    examplePlan = null,
+    preparing = false;
+
   let draft = "",
     pending = false,
     result = null,
@@ -15,10 +45,16 @@ const partnerIntake = (() => {
     $("#intake-status").textContent = notice;
     $("#intake-results").innerHTML = results();
     $("#intake-payload").disabled = pending;
+    $("#intake-example").disabled = pending;
+    $("#example-explanation").textContent = examples[exampleKind][1];
+    $('[data-intake="example"]').textContent = preparing
+      ? "Preparing…"
+      : "Load example";
     document.querySelectorAll("[data-intake]").forEach((b) => {
       b.disabled = pending || !runtime.demo;
     });
-    $("#intake-submit").textContent = pending ? "Sending…" : "Send batch →";
+    $("#intake-submit").textContent =
+      pending && !preparing ? "Sending…" : "Send batch →";
   }
   function render() {
     return (
@@ -28,9 +64,26 @@ const partnerIntake = (() => {
         '<a class="button" href="#ledger">Open delivery ledger ↗</a>',
         "PARTNER INTEGRATION",
       ) +
-      `<div id="partner-intake"><div class="view-intro"><span class="big">⇄</span><div>Synthetic partner contract · Real Go API. Accepted receipts change the local demo database. This is not a connected or certified Vistar integration.</div></div><div class="intake-grid"><section class="panel intake-card"><h2>1. Prepare a playback batch</h2><p>Reserve a play in <a class="text-link" href="#campaigns">Campaigns</a>, then load an example: two events for that play and one malformed neighbor. Sending again preserves event IDs to demonstrate safe retries.</p><div class="actions"><button class="button" data-intake="example" ${pending || !runtime.demo ? "disabled" : ""}>Load example</button></div><label for="intake-payload">Request body · up to 50 receipts</label><textarea id="intake-payload" spellcheck="false" ${pending ? "disabled" : ""} placeholder='{"receipts": [...]}' aria-describedby="intake-status">${esc(draft)}</textarea><div class="actions"><button id="intake-submit" class="button primary" data-intake="send" ${pending || !runtime.demo ? "disabled" : ""}>${pending ? "Sending…" : "Send batch →"}</button></div><p id="intake-status" class="intake-status" role="status">${esc(notice)}</p></section><section class="panel intake-card"><h2>2. Inspect durable acceptance</h2><p>A 202 item means the receipt and outbox committed together. A 207 batch contains mixed results. Settlement happens asynchronously; acceptance alone is not a charge.</p><div id="intake-results" aria-live="polite">${results()}</div></section></div><div class="decision-grid"><article class="panel decision"><h3>Event identity</h3><p>An unchanged event ID and payload return the original receipt. Changing content under the same ID produces a conflict.</p></article><article class="panel decision"><h3>Business identity</h3><p>Two different events can report one play. The reservation transition prevents a second financial effect.</p></article><article class="panel decision"><h3>Recoverable failures</h3><p>On a timeout, the outcome may be unknown. Keep IDs and content unchanged. Honor Retry-After on 429; inspect quarantined evidence in Recovery queue.</p></article><article class="panel decision"><h3>Transport boundary</h3><p>Current transport: ${esc(runtime.transport)}. The SQL outbox separates API acceptance from delivery. The managed Pub/Sub path requires separate staging verification.</p></article></div></div>`
+      `<div id="partner-intake"><div class="view-intro"><span class="big">⇄</span><div>Synthetic partner contract · Real Go API. Accepted receipts change the local demo database. This is not a connected or certified Vistar integration.</div></div><div class="intake-grid"><section class="panel intake-card"><h2>1. Prepare a playback batch</h2><p>Choose a scenario and load its request. Loading automatically reserves $0.01 of synthetic budget when needed; playback is sent only when you click Send batch. Repeated loads reuse the unsent hold.</p><label for="intake-example">Example scenario</label><select id="intake-example" ${pending ? "disabled" : ""}>${Object.entries(
+        examples,
+      )
+        .map(
+          ([key, v]) =>
+            `<option value="${key}" ${key === exampleKind ? "selected" : ""}>${v[0]}</option>`,
+        )
+        .join(
+          "",
+        )}</select><p id="example-explanation">${examples[exampleKind][1]}</p><div class="actions"><button class="button" data-intake="example" ${pending || !runtime.demo ? "disabled" : ""}>Load example</button></div><label for="intake-payload">Request body · up to 50 receipts</label><textarea id="intake-payload" spellcheck="false" ${pending ? "disabled" : ""} placeholder='{"receipts": [...]}' aria-describedby="intake-status">${esc(draft)}</textarea><div class="actions"><button id="intake-submit" class="button primary" data-intake="send" ${pending || !runtime.demo ? "disabled" : ""}>${pending && !preparing ? "Sending…" : "Send batch →"}</button></div><p id="intake-status" class="intake-status" role="status">${esc(notice)}</p></section><section class="panel intake-card"><h2>2. Inspect durable acceptance</h2><p>A 202 item means the receipt and outbox committed together. A 207 batch contains mixed results. Settlement happens asynchronously; acceptance alone is not a charge.</p><div id="intake-results" aria-live="polite">${results()}</div></section></div><div class="decision-grid"><article class="panel decision"><h3>Event identity</h3><p>An unchanged event ID and payload return the original receipt. Changing content under the same ID produces a conflict.</p></article><article class="panel decision"><h3>Business identity</h3><p>Two different events can report one play. The reservation transition prevents a second financial effect.</p></article><article class="panel decision"><h3>Recoverable failures</h3><p>On a timeout, the outcome may be unknown. Keep IDs and content unchanged. Honor Retry-After on 429; inspect quarantined evidence in Recovery queue.</p></article><article class="panel decision"><h3>Transport boundary</h3><p>Current transport: ${esc(runtime.transport)}. The SQL outbox separates API acceptance from delivery. The managed Pub/Sub path requires separate staging verification.</p></article></div></div>`
     );
   }
+  document.addEventListener("change", (e) => {
+    if (e.target.id === "intake-example") {
+      exampleKind = e.target.value;
+      notice =
+        "Click Load example to prepare this scenario. The current request body is unchanged.";
+      update();
+    }
+  });
   document.addEventListener("input", (e) => {
     if (e.target.id === "intake-payload") draft = e.target.value;
   });
@@ -38,38 +91,90 @@ const partnerIntake = (() => {
     const b = e.target.closest("[data-intake]");
     if (!b || pending || !runtime.demo) return;
     if (b.dataset.intake === "example") {
-      const r = state.reservations.find(
-        (r) => r.state === "held" && r.expires_at > Date.now(),
-      );
-      if (!r) {
-        notice =
-          "Reserve a new play in Campaigns first, then load the example.";
-        update();
-        return;
-      }
-      const receipt = {
-        schema_version: 1,
-        event_id: crypto.randomUUID(),
-        reservation_id: r.id,
-        screen_id: r.screen_id,
-        played_at: Date.now(),
-        duration_ms: 10000,
-      };
-      draft = JSON.stringify(
-        {
-          receipts: [
-            receipt,
-            { ...receipt, event_id: crypto.randomUUID() },
-            { unexpected_field: "deliberately malformed" },
-          ],
-        },
-        null,
-        2,
-      );
-      $("#intake-payload").value = draft;
-      result = null;
-      notice = "Example prepared. Nothing has been sent yet.";
+      pending = true;
+      preparing = true;
+      notice = "Preparing a real demo reservation…";
       update();
+      try {
+        if (
+          !examplePlan ||
+          (examplePlan.hold && examplePlan.hold.expires_at <= Date.now())
+        ) {
+          const snapshot = await request("/api/v1/snapshot");
+          const campaign = snapshot.campaigns.find(
+            (c) =>
+              c.budget_micros - c.spent_micros - c.reserved_micros >= 10000,
+          );
+          if (!campaign || !snapshot.screens.length)
+            throw new Error(
+              "No campaign has $0.01 available. Check campaign budgets.",
+            );
+          examplePlan = {
+            key: crypto.randomUUID(),
+            input: {
+              campaign_id: campaign.id,
+              screen_id: snapshot.screens[0].id,
+              cost_micros: 10000,
+            },
+          };
+        }
+        if (!examplePlan.hold)
+          examplePlan.hold = await request(
+            "/api/v1/reservations",
+            examplePlan.input,
+            { "Idempotency-Key": examplePlan.key },
+          );
+        const r = examplePlan.hold;
+        const receipt = {
+          schema_version: 1,
+          event_id: crypto.randomUUID(),
+          reservation_id: r.id,
+          screen_id: r.screen_id,
+          played_at: r.created_at + 1,
+          duration_ms: 10000,
+        };
+        let receipts;
+        switch (exampleKind) {
+          case "clean":
+            receipts = [receipt];
+            break;
+          case "duplicate":
+            receipts = Array.from({ length: 5 }, () => ({
+              ...receipt,
+              event_id: crypto.randomUUID(),
+            }));
+            break;
+          case "replay":
+            receipts = [receipt, { ...receipt }];
+            break;
+          case "schema":
+            receipts = [{ ...receipt, schema_version: 99 }];
+            break;
+          case "window":
+            receipts = [{ ...receipt, played_at: r.created_at - 1000 }];
+            break;
+          default:
+            receipts = [
+              receipt,
+              { ...receipt, event_id: crypto.randomUUID() },
+              { unexpected_field: "deliberately malformed" },
+            ];
+        }
+        draft = JSON.stringify({ receipts }, null, 2);
+        if ($("#intake-payload")) $("#intake-payload").value = draft;
+        result = null;
+        notice =
+          "Example ready. A $0.01 demo hold is reserved; no playback receipts have been sent. " +
+          examples[exampleKind][1];
+      } catch (e) {
+        notice =
+          e.message +
+          " Click Load example to retry; an uncertain reservation keeps the same request key.";
+      } finally {
+        pending = false;
+        preparing = false;
+        update();
+      }
       return;
     }
     let body;
@@ -87,6 +192,7 @@ const partnerIntake = (() => {
       return;
     }
     pending = true;
+    examplePlan = null; // A submitted hold must not be reused for a new example, even after a lost response.
     result = null;
     notice = "Sending to the Go intake API…";
     update();
@@ -105,6 +211,7 @@ const partnerIntake = (() => {
       if (!Array.isArray(data.results))
         throw new Error("Unreadable result; acceptance is unknown.");
       result = data;
+      examplePlan = null;
       httpStatus = response.status;
       notice =
         "Response received. Original payload retained for an unchanged retry.";
