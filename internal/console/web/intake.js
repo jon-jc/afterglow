@@ -26,7 +26,8 @@ const partnerIntake = (() => {
       "Playback predates the reservation. Expect durable acceptance, then quarantine.",
     ],
   };
-  let price = "0.01";
+  let price = "0.01",
+    priceError = "";
   function priceMicros() {
     const value = price.trim();
     if (!/^\d{1,9}(\.\d{1,2})?$/.test(value))
@@ -61,6 +62,8 @@ const partnerIntake = (() => {
     $("#intake-results").innerHTML = results();
     $("#intake-payload").disabled = pending;
     $("#intake-example").disabled = pending;
+    $("#intake-price-error").textContent = priceError;
+    $("#intake-price").setAttribute("aria-invalid", String(!!priceError));
     $("#intake-price").disabled =
       pending || !!(examplePlan && !examplePlan.hold);
     $("#example-explanation").textContent = examples[exampleKind][1];
@@ -90,7 +93,7 @@ const partnerIntake = (() => {
         )
         .join(
           "",
-        )}</select><p id="example-explanation">${examples[exampleKind][1]}</p><label for="intake-price">Reservation price · USD</label><input id="intake-price" type="text" inputmode="decimal" value="${esc(price)}" aria-describedby="intake-price-help" ${pending || (examplePlan && !examplePlan.hold) ? "disabled" : ""}><p id="intake-price-help">$0.01–$1,000.00, up to two decimal places. Applies when you load a new example. Existing reservations are unchanged.</p><div class="actions"><button class="button" data-intake="example" ${pending || !runtime.demo ? "disabled" : ""}>Load example</button></div><label for="intake-payload">Request body · up to 50 receipts</label><textarea id="intake-payload" spellcheck="false" ${pending ? "disabled" : ""} placeholder='{"receipts": [...]}' aria-describedby="intake-status">${esc(draft)}</textarea><div class="actions"><button id="intake-submit" class="button primary" data-intake="send" ${pending || !runtime.demo ? "disabled" : ""}>${pending && !preparing ? "Sending…" : "Send batch →"}</button></div><p id="intake-status" class="intake-status" role="status">${esc(notice)}</p></section><section class="panel intake-card"><h2>2. Inspect durable acceptance</h2><p>A 202 item means the receipt and outbox committed together. A 207 batch contains mixed results. Settlement happens asynchronously; acceptance alone is not a charge.</p><div id="intake-results" aria-live="polite">${results()}</div></section></div><div class="decision-grid"><article class="panel decision"><h3>Event identity</h3><p>An unchanged event ID and payload return the original receipt. Changing content under the same ID produces a conflict.</p></article><article class="panel decision"><h3>Business identity</h3><p>Two different events can report one play. The reservation transition prevents a second financial effect.</p></article><article class="panel decision"><h3>Recoverable failures</h3><p>On a timeout, the outcome may be unknown. Keep IDs and content unchanged. Honor Retry-After on 429; inspect quarantined evidence in Recovery queue.</p></article><article class="panel decision"><h3>Transport boundary</h3><p>Current transport: ${esc(runtime.transport)}. The SQL outbox separates API acceptance from delivery. The managed Pub/Sub path requires separate staging verification.</p></article></div></div>`
+        )}</select><p id="example-explanation">${examples[exampleKind][1]}</p><label for="intake-price">Reservation price · USD</label><input id="intake-price" type="text" inputmode="decimal" value="${esc(price)}" aria-describedby="intake-price-help intake-price-error" aria-invalid="${!!priceError}" ${pending || (examplePlan && !examplePlan.hold) ? "disabled" : ""}><p id="intake-price-error" class="form-error" role="status">${esc(priceError)}</p><p id="intake-price-help">$0.01–$1,000.00, up to two decimal places. Applies when you load a new example. Existing reservations are unchanged.</p><div class="actions"><button class="button" data-intake="example" ${pending || !runtime.demo ? "disabled" : ""}>Load example</button></div><label for="intake-payload">Request body · up to 50 receipts</label><textarea id="intake-payload" spellcheck="false" ${pending ? "disabled" : ""} placeholder='{"receipts": [...]}' aria-describedby="intake-status">${esc(draft)}</textarea><div class="actions"><button id="intake-submit" class="button primary" data-intake="send" ${pending || !runtime.demo ? "disabled" : ""}>${pending && !preparing ? "Sending…" : "Send batch →"}</button></div><p id="intake-status" class="intake-status" role="status">${esc(notice)}</p></section><section class="panel intake-card"><h2>2. Inspect durable acceptance</h2><p>A 202 item means the receipt and outbox committed together. A 207 batch contains mixed results. Settlement happens asynchronously; acceptance alone is not a charge.</p><div id="intake-results" aria-live="polite">${results()}</div></section></div><div class="decision-grid"><article class="panel decision"><h3>Event identity</h3><p>An unchanged event ID and payload return the original receipt. Changing content under the same ID produces a conflict.</p></article><article class="panel decision"><h3>Business identity</h3><p>Two different events can report one play. The reservation transition prevents a second financial effect.</p></article><article class="panel decision"><h3>Recoverable failures</h3><p>On a timeout, the outcome may be unknown. Keep IDs and content unchanged. Honor Retry-After on 429; inspect quarantined evidence in Recovery queue.</p></article><article class="panel decision"><h3>Transport boundary</h3><p>Current transport: ${esc(runtime.transport)}. The SQL outbox separates API acceptance from delivery. The managed Pub/Sub path requires separate staging verification.</p></article></div></div>`
     );
   }
   document.addEventListener("change", (e) => {
@@ -105,6 +108,7 @@ const partnerIntake = (() => {
     if (e.target.id === "intake-payload") draft = e.target.value;
     if (e.target.id === "intake-price") {
       price = e.target.value;
+      priceError = "";
       notice =
         "Click Load example to apply this price. The current request body and existing reservation are unchanged.";
       update();
@@ -117,7 +121,9 @@ const partnerIntake = (() => {
       let cost;
       try {
         cost = priceMicros();
+        priceError = "";
       } catch (e) {
+        priceError = e.message;
         notice = e.message;
         update();
         $("#intake-price").focus();
@@ -158,6 +164,12 @@ const partnerIntake = (() => {
             { "Idempotency-Key": examplePlan.key },
           );
         const r = examplePlan.hold;
+        if (r.state !== "held" || r.expires_at <= Date.now()) {
+          examplePlan = null;
+          throw new Error(
+            "The recovered reservation is no longer available. Load again to prepare a fresh example.",
+          );
+        }
         const receipt = {
           schema_version: 1,
           event_id: crypto.randomUUID(),
@@ -200,9 +212,19 @@ const partnerIntake = (() => {
           `Example ready. A ${money(r.cost_micros)} demo hold is reserved; no playback receipts have been sent. ` +
           examples[exampleKind][1];
       } catch (e) {
+        // Only definitive input/auth/budget rejections discard the plan. Timeouts,
+        // rate limits and server failures keep the original idempotency key.
+        if (
+          examplePlan &&
+          !examplePlan.hold &&
+          [400, 401, 403, 404, 409, 422].includes(e.status)
+        )
+          examplePlan = null;
         notice =
           e.message +
-          " Click Load example to retry; an uncertain reservation keeps the same request key.";
+          (examplePlan && !examplePlan.hold
+            ? " Click Load example to retry; an uncertain reservation keeps the same request key."
+            : " Adjust the price if needed, then click Load example again.");
       } finally {
         pending = false;
         preparing = false;
