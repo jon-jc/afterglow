@@ -36,6 +36,8 @@ Open **http://127.0.0.1:8090** and choose **Live proof**. The local run uses per
 
 **GoLand:** open this folder, let the Go module index, and run the checked-in **Afterglow** configuration. Set breakpoints in `Reserve`, `Accept`, and `Process`. Windows users can also run `./scripts/start.ps1`.
 
+**Campaign assurance:** inspect full retained campaign delivery by screen, reconcile balances to reservations, and export operational evidence. Includes explainable follow-up for held plays and partner exceptions. [Design and scope](docs/campaign-assurance.md).
+
 **Live proof:** choose **Live proof** for a six-stage, resumable run against the Go API: reserve, accept, retry, reconcile, correct, and verify. Each run uses two cents of synthetic budget and exports the observed evidence.
 
 **Partner intake:** reserve a play in Campaigns, then open **Partner intake** to send a mixed batch to the Go API. Inspect per-item results, retry unchanged identities, and follow asynchronous decisions in the ledger. The optional airport reference service remains a standalone backend experiment; its console section has been removed.

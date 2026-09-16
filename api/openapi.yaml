@@ -8,6 +8,22 @@ servers:
 security:
   - bearer: []
 paths:
+  /api/v1/campaigns/{id}/assurance:
+    get:
+      operationId: getCampaignAssurance
+      summary: Full retained campaign delivery and budget assurance
+      description: Consistent read of campaign balances and per-screen reservation aggregates plus independently counted linked receipt decisions. Not audience measurement. Unknown-reservation receipts are excluded because they cannot be attributed to a campaign.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 100, pattern: '^[a-zA-Z0-9_-]+$'}
+      responses:
+        '200': {description: 'Campaign balances, screen summaries, decision counts, budget_consistent, held_plays, settled_plays, awaiting_evidence, scope and observed_at.'}
+        '401': {description: Invalid credential}
+        '404': {description: Campaign not found in authenticated tenant}
+        '422': {description: Invalid campaign identifier}
+        '503': {description: Storage unavailable or read timeout}
   /api/v1/deliveries/{id}:
     get:
       operationId: getDeliveryEvidence

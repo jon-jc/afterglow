@@ -1,6 +1,12 @@
 "use strict";
 (() => {
   const pages = [
+    [
+      "assurance",
+      "✓",
+      "Campaign assurance",
+      "Full-history delivery and budget reconciliation",
+    ],
     ["overview", "◫", "Overview", "Campaign performance and delivery health"],
     ["campaigns", "▤", "Campaigns", "Budgets, reservations and playback"],
     ["intake", "⇄", "Partner intake", "Submit and inspect playback batches"],
