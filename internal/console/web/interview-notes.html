@@ -832,7 +832,7 @@
         ><a href="#rehearsal"><span>09</span>Final preparation</a
         ><a href="#glossary"><span>10</span>Plain-English glossary</a
         ><a href="#sources"><span>11</span>Evidence & sources</a
-        ><a href="#airport-extension"><span>+</span>Airport microservice</a>
+        ><a href="#partner-intake"><span>+</span>Partner intake</a>
       </nav>
       <p class="note">
         Lead with the problem. Explain your decision. Name the trade-off. Show
@@ -859,7 +859,7 @@
             ><a href="#rehearsal"><span>09</span>Final preparation</a
             ><a href="#glossary"><span>10</span>Plain-English glossary</a
             ><a href="#sources"><span>11</span>Evidence & sources</a
-            ><a href="#airport-extension"><span>+</span>Airport microservice</a>
+            ><a href="#partner-intake"><span>+</span>Partner intake</a>
           </nav>
         </details>
         <a href="#rehearsal">Rehearsal checklist</a
@@ -1567,13 +1567,30 @@ released + late evidence → quarantine; no automatic charge</code></pre>
               </p>
             </div>
           </details>
-          <h3>Release safety is now an explicit boundary</h3><p>Protected startup requires PostgreSQL, an explicit tenant and API credentials. Schema changes run through a separate migration command; application startup only checks the recorded version and checksum. Tests include a read-only PostgreSQL connection, so the runtime does not need DDL permissions to verify its schema.</p><p>Credential rotation can temporarily accept current and previous keys; removing the previous key ends the overlap. These controls improve deployment safety, but real rollout, restore, load and managed-service failure drills still need to happen. See the <a href="https://github.com/jon-jc/afterglow/blob/main/docs/production-readiness.md">production release gates</a>.</p><h3>5. Evidence must be visible</h3>
+          <h3>Release safety is now an explicit boundary</h3>
+          <p>
+            Protected startup requires PostgreSQL, an explicit tenant and API
+            credentials. Schema changes run through a separate migration
+            command; application startup only checks the recorded version and
+            checksum. Tests include a read-only PostgreSQL connection, so the
+            runtime does not need DDL permissions to verify its schema.
+          </p>
+          <p>
+            Credential rotation can temporarily accept current and previous
+            keys; removing the previous key ends the overlap. These controls
+            improve deployment safety, but real rollout, restore, load and
+            managed-service failure drills still need to happen. See the
+            <a
+              href="https://github.com/jon-jc/afterglow/blob/main/docs/production-readiness.md"
+              >production release gates</a
+            >.
+          </p>
+          <h3>5. Evidence must be visible</h3>
           <p>
             The console reads actual database state: held budget, settled spend,
             receipt decisions, attempt counts and audit history. Its overview
-            map is synthetic screen inventory; the separate airport explorer
-            uses real reference data. It does not estimate real reach, identify
-            viewers or claim advertising conversion lift.
+            map is synthetic screen inventory. It does not estimate real reach,
+            identify viewers or claim advertising conversion lift.
           </p>
           <div class="callout amber">
             <p>
@@ -1588,100 +1605,46 @@ released + late evidence → quarantine; no automatic charge</code></pre>
           </div>
         </section>
 
-        <section id="airport-extension">
-          <span class="section-number">EXTENSION / EXTERNAL DATA</span>
-          <h2>A Go microservice that can fail independently.</h2>
+        <section id="partner-intake">
+          <span class="section-number">EXTENSION / PARTNER INTEGRATION</span>
+          <h2>Make the integration contract observable.</h2>
+          <p>
+            Fluxgate asks when telemetry is durable and how redelivery avoids
+            double counting. Afterglow applies those fundamentals to playback
+            reconciliation: settle reserved budget only once.
+          </p>
           <div class="speak">
             <span class="label">THE 30-SECOND EXPLANATION</span>
             <p>
-              “I added a separate Go service to refresh airport reference data.
-              It validates a complete source download before replacing the
-              catalog, persists the last good snapshot, and marks data stale
-              after a failed refresh. Airport-data availability is useful for
-              exploration, but it must not become a dependency of accepting
-              receipts or settling reserved budget.”
+              “The partner intake console sends real batches to my Go API. Each
+              receipt gets its own transaction and explicit result. A malformed
+              neighbor cannot erase valid work. Retrying an unchanged event
+              returns its durable identity, while a separate reservation guard
+              prevents another charge from a different event reporting the same
+              play.”
             </p>
           </div>
           <p>
-            The airport explorer includes US and US territories where
-            OurAirports reports scheduled airline service. That is a documented
-            data filter, not a claim about FAA classifications, passenger counts
-            or CCO advertising rights. The first import contained 720 records;
-            the UI displays the current count.
+            Reserve a play in Campaigns, then open Partner intake and load an
+            example. It includes one valid receipt, a second event for the same
+            play, and one malformed item. A 207 response exposes partial
+            success. Resubmit unchanged to demonstrate persistent request
+            deduplication; inspect the ledger to distinguish durable acceptance
+            from the eventual financial decision.
           </p>
-          <div class="flow">
-            <div>OurAirports CSV<small>External source</small></div>
-            <span>→</span>
-            <div>
-              Go catalog service<small
-                >Validate, persist, publish snapshot</small
-              >
-            </div>
-            <span>→</span>
-            <div>
-              Afterglow API<small>Fixed upstream, bounded timeout</small>
-            </div>
-            <span>→</span>
-            <div>Airport explorer<small>Search, map, freshness</small></div>
-          </div>
-          <details>
-            <summary>
-              Why use a separate service, and what is the trade-off?
-            </summary>
-            <div class="answer">
-              <p>
-                The ingestion cadence and failure model differ from the
-                financial pipeline. Reference data refreshes daily and can
-                remain useful when slightly stale. Financial changes require
-                transactional correctness immediately. Separation lets the
-                external fetch fail without blocking settlement, but introduces
-                another process, health boundary, deployment and operational
-                responsibility.
-              </p>
-              <p>
-                This local service uses a process-owned file snapshot. Cloud
-                deployment still needs authenticated service-to-service access,
-                durable shared storage and a deliberate refresh owner. Do not
-                describe the local implementation as already operating on Cloud
-                Run.
-              </p>
-            </div>
-          </details>
-          <details>
-            <summary>How does batch intake extend the Fluxgate story?</summary>
-            <div class="answer">
-              <p>
-                The Go endpoint <code>POST /api/v1/receipts/batch</code> accepts
-                up to 50 items, returns an ordered result for each, and
-                preserves valid neighboring receipts when one is malformed or
-                conflicts. It charges admission tokens per item so batching does
-                not bypass rate limits. Each accepted receipt and its outbox
-                intent commit together; the entire batch is intentionally not
-                one transaction.
-              </p>
-              <p>
-                A lost batch response is handled by retrying unchanged event IDs
-                and payloads. That connects Fluxgate's partial-success principle
-                to Afterglow's persistent identities. A 202 item means durable
-                acceptance; a later consumer can still quarantine unsupported
-                evidence.
-              </p>
-            </div>
-          </details>
           <p>
-            <a href="http://127.0.0.1:8090/#airports"
-              >Open the airport explorer ↗</a
-            >
-            ·
-            <a
-              href="https://github.com/jon-jc/afterglow/blob/main/docs/airports.md"
-              >Service architecture and GoLand walkthrough</a
-            >
-            ·
-            <a href="https://ourairports.com/help/data-dictionary.html"
-              >Source field definitions</a
-            >
+            The API limits batches to 50 receipts and charges admission tokens
+            per item. Honor Retry-After on 429. Transport failures can have an
+            unknown outcome, so retain the exact event IDs and payload. A 409
+            means an existing identity was reused with different content.
           </p>
+          <p>
+            This is a synthetic contract, not Vistar's wire format or a
+            certified integration. Local transport is SQL-backed; managed
+            Pub/Sub and actual partner contract validation still require staging
+            evidence.
+          </p>
+          <a href="/#intake">Open partner intake ↗</a>
         </section>
         <section id="demo">
           <span class="section-number">05 / YOUR LIVE DEMO</span>
@@ -1933,10 +1896,10 @@ released + late evidence → quarantine; no automatic charge</code></pre>
               <p>
                 “I’d prioritize a real partner contract and trustworthy playback
                 evidence, then operational controls: complete campaign/catalog
-                lifecycle, migration rollout rehearsals, credential rotation, retention,
-                alerting, backup restore drills and load testing against agreed
-                targets. I’d also review database permissions and fleet-wide
-                admission control.”
+                lifecycle, migration rollout rehearsals, credential rotation,
+                retention, alerting, backup restore drills and load testing
+                against agreed targets. I’d also review database permissions and
+                fleet-wide admission control.”
               </p>
               <p>
                 The present audit is append-only by application convention, not
