@@ -6,9 +6,23 @@ This module demonstrates a partner aggregate feed using **synthetic data only**.
 
 Start Afterglow normally. Open **Foot traffic → Load sample feed → Replay last batch**. Counts stay unchanged on replay. Expand a zone to inspect hourly counts, missing data and suppression. The report covers six completed UTC hours and compares corresponding hours from the previous day. Percent change only uses pairs where both counts are reportable.
 
+Use **Choose a sample feed** to explore four datasets:
+
+| Sample | What to inspect |
+| --- | --- |
+| Balanced activity | The original mix of reportable counts and small windows. |
+| High activity | All 24 current windows are reportable, with larger synthetic counts. |
+| Missing coverage | Nine current windows are missing; the transit zone has no comparison. |
+| Low counts | Eighteen current windows are suppressed; downtown remains reportable. |
+
+Select a sample, then **Load sample feed**. Each sample keeps separate observations, including after switching away and returning. **Refresh report** reads saved data and shows when it was checked; it does not generate observations. The top-bar refresh also refreshes this report. Expanded hourly tables remain open.
+
+The most recent batch for each sample is retained in tab-scoped session storage, so replay remains available after navigation or a page reload. If an import response is lost, **Retry last batch** resends the exact saved input. Storage failures fall back to in-memory operation. No credentials or personal data are stored. A new completed hour can move the report window even though replay inserts no observations.
+
 ## API and guarantees
 
 - `GET /api/v1/foot-traffic/example` generates a deterministic synthetic batch: four fixed zones, six hours, two days. The generated input deliberately includes small counts.
+- All three endpoints accept an optional `scenario=baseline|busy|gaps|quiet` query. Omission preserves the original default dataset. Invalid or repeated scenario parameters return 400. Named samples use isolated namespaces derived from the server-configured tenant; callers cannot select another tenant. Counts are deterministic per zone/hour within each sample, so overlapping imports agree. These namespaces are synthetic demonstration datasets, not production provider or revision semantics.
 - `POST /api/v1/foot-traffic/batches` validates and commits synchronously. **201** means the batch transaction finished; **200** returns a previously committed batch result. It does not return 202 or imply an asynchronous pipeline that is not present.
 - `GET /api/v1/foot-traffic/report` emits fixed windows. Counts below 20 become `null`, with `status: "suppressed"`. Missing windows are also `null`, with a distinct `missing` status. Published totals include only released cells; comparisons exclude unreportable pairs.
 - A unique `(tenant, batch_id)` plus canonical fingerprint prevents changed-payload retries. A unique `(tenant, source, zone, hour)` prevents the same window being counted again under a new batch ID. Conflicting content rolls back the **whole** transaction.

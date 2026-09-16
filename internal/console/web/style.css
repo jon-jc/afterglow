@@ -2424,6 +2424,34 @@ td .text-link.mono {
   gap: 20px;
   margin: 20px 0;
 }
+.traffic-samples {
+  display: grid;
+  grid-template-columns: minmax(200px, 260px) minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  padding: 22px 24px;
+}
+.traffic-samples label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 9px;
+  color: var(--muted);
+}
+.traffic-samples select {
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+.traffic-samples select option { background: #142126; color: #edf2ee; }
+.traffic-samples p { margin: 0 0 7px; font-size: 13px; line-height: 1.6; }
+.traffic-samples small, .traffic-freshness { color: var(--muted); font-size: 12px; line-height: 1.6; }
+.traffic-freshness { margin: 0 0 16px; }
+.traffic-samples select:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 .traffic-zone {
   min-width: 0;
   overflow: hidden;
@@ -2541,6 +2569,7 @@ td .text-link.mono {
   min-height: 5px;
 }
 @media (max-width: 800px) {
+  .traffic-samples { grid-template-columns: 1fr; gap: 16px; padding: 18px; }
   .traffic-grid,
   .traffic-method-grid {
     grid-template-columns: 1fr;

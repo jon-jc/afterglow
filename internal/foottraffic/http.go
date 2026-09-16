@@ -30,16 +30,44 @@ func (s *Store) Handler(tenant string) http.Handler {
 		}
 		write(w, code, map[string]any{"status": code, "detail": detail})
 	}
+	// Fixed synthetic scenarios are separate views of one authorized tenant.
+	// Reject invalid selection before any database operation.
+	scenarioFor := func(w http.ResponseWriter, r *http.Request) (string, bool) {
+		values, present := r.URL.Query()["scenario"]
+		if !present {
+			return "baseline", true
+		}
+		if len(values) != 1 || !validScenario(values[0]) {
+			write(w, 400, map[string]string{"detail": "Choose baseline, busy, gaps or quiet as the sample scenario."})
+			return "", false
+		}
+		return values[0], true
+	}
 	mux.HandleFunc("GET /api/v1/foot-traffic/report", func(w http.ResponseWriter, r *http.Request) {
-		v, e := s.Report(r.Context(), tenant, time.Now())
+		scenario, ok := scenarioFor(w, r)
+		if !ok {
+			return
+		}
+		v, e := s.Report(r.Context(), scenarioTenant(tenant, scenario), time.Now())
 		if e != nil {
 			fail(w, e)
 			return
 		}
 		write(w, 200, v)
 	})
-	mux.HandleFunc("GET /api/v1/foot-traffic/example", func(w http.ResponseWriter, r *http.Request) { write(w, 200, Example(time.Now())) })
+	mux.HandleFunc("GET /api/v1/foot-traffic/example", func(w http.ResponseWriter, r *http.Request) {
+		scenario, ok := scenarioFor(w, r)
+		if !ok {
+			return
+		}
+		b, _ := ExampleForScenario(time.Now(), scenario)
+		write(w, 200, b)
+	})
 	mux.HandleFunc("POST /api/v1/foot-traffic/batches", func(w http.ResponseWriter, r *http.Request) {
+		scenario, ok := scenarioFor(w, r)
+		if !ok {
+			return
+		}
 		media, _, err := mime.ParseMediaType(r.Header.Get("Content-Type"))
 		if err != nil || media != "application/json" {
 			write(w, 415, map[string]string{"detail": "application/json required"})
@@ -62,7 +90,7 @@ func (s *Store) Handler(tenant string) http.Handler {
 			write(w, 400, map[string]string{"detail": "One JSON object required"})
 			return
 		}
-		v, e := s.Ingest(r.Context(), tenant, b, time.Now())
+		v, e := s.Ingest(r.Context(), scenarioTenant(tenant, scenario), b, time.Now())
 		if e != nil {
 			fail(w, e)
 			return
