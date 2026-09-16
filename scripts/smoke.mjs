@@ -179,7 +179,7 @@ try {
   assert.equal(rejected.status, 400);
   assert.equal(spent((await req("/api/v1/snapshot")).data), spent(s));
   checks.push("Foot-traffic batch replay, suppression and settlement isolation");
-  for (const sample of ["busy", "gaps", "quiet"]) {
+  for (const sample of ["busy", "gaps", "quiet", "commuter", "retail", "threshold", "interruption"]) {
     const query = `?scenario=${sample}`;
     const feed = (await req(`/api/v1/foot-traffic/example${query}`)).data;
     assert.equal((await req(`/api/v1/foot-traffic/batches${query}`, feed)).status, 201);
@@ -189,10 +189,28 @@ try {
     if (sample === "busy") assert.equal(report.released_windows, 24);
     if (sample === "gaps") assert.equal(report.missing_windows, 9);
     if (sample === "quiet") assert.equal(report.suppressed_windows, 18);
+    if (sample === "threshold") assert.equal(report.suppressed_windows, 12);
+    if (sample === "interruption") assert.equal(report.missing_windows, 8);
   }
   assert.equal((await req("/api/v1/foot-traffic/report")).data.published_observations, traffic.data.published_observations);
   assert.equal(spent((await req("/api/v1/snapshot")).data), spent(s));
-  checks.push("Four isolated sample feeds retain counts across refresh and replay");
+  checks.push("Eight isolated sample feeds retain counts across refresh and replay");
+  for (let n = 0; n < 2; n++) {
+    const generated = (await req("/api/v1/foot-traffic/example?scenario=random")).data;
+    assert.equal((await req("/api/v1/foot-traffic/random-batches?scenario=random", generated)).status, 201);
+    const before = (await req("/api/v1/foot-traffic/report?scenario=random")).data;
+    assert.equal((await req("/api/v1/foot-traffic/random-batches?scenario=random", generated)).status, 200);
+    assert.deepEqual((await req("/api/v1/foot-traffic/report?scenario=random")).data.zones, before.zones);
+  }
+  assert.equal((await req("/api/v1/foot-traffic/empty?scenario=random", {})).status, 200);
+  const empty = (await req("/api/v1/foot-traffic/report?scenario=random")).data;
+  assert.equal(empty.missing_windows, 24);
+  assert.equal(empty.published_observations, 0);
+  assert.ok(empty.zones.every(z => [...z.current, ...z.previous].every(c => c.status === "missing")));
+  const baselineAfter = (await req("/api/v1/foot-traffic/report")).data;
+  assert.equal(baselineAfter.published_observations, traffic.data.published_observations);
+  assert.equal(spent((await req("/api/v1/snapshot")).data), spent(s));
+  checks.push("Random replacement, retry and empty preserve other samples and settlement");
   mkdirSync(path.join(root, "artifacts"), { recursive: true });
   const report = {
     passed: true,

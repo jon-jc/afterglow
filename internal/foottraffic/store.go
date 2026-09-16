@@ -61,6 +61,7 @@ func (s *Store) Migrate(ctx context.Context) error {
 	}
 	defer tx.Rollback()
 	for _, q := range []string{
+		`CREATE TABLE IF NOT EXISTS traffic_scopes_v1 (tenant TEXT PRIMARY KEY)`,
 		`CREATE TABLE IF NOT EXISTS traffic_batches_v1 (tenant TEXT NOT NULL, id TEXT NOT NULL, fingerprint TEXT NOT NULL, inserted BIGINT NOT NULL, PRIMARY KEY(tenant,id))`,
 		`CREATE TABLE IF NOT EXISTS traffic_windows_v1 (tenant TEXT NOT NULL, source TEXT NOT NULL, zone TEXT NOT NULL, start_ms BIGINT NOT NULL, observations BIGINT NOT NULL CHECK(observations >= 0 AND observations <= 1000000), PRIMARY KEY(tenant,source,zone,start_ms))`,
 		`CREATE INDEX IF NOT EXISTS traffic_time_v1 ON traffic_windows_v1(tenant,start_ms)`,
@@ -72,6 +73,16 @@ func (s *Store) Migrate(ctx context.Context) error {
 	return tx.Commit()
 }
 func (s *Store) Ingest(ctx context.Context, tenant string, b Batch, now time.Time) (Result, error) {
+	return s.ingest(ctx, tenant, b, now, false)
+}
+
+// ReplaceSample swaps a random sandbox dataset atomically. An exact retry of
+// the current batch returns its result before any rows are removed.
+func (s *Store) ReplaceSample(ctx context.Context, tenant string, b Batch, now time.Time) (Result, error) {
+	return s.ingest(ctx, tenant, b, now, true)
+}
+
+func (s *Store) ingest(ctx context.Context, tenant string, b Batch, now time.Time, replace bool) (Result, error) {
 	result := Result{ID: b.ID}
 	if !identity.MatchString(tenant) || !identity.MatchString(b.ID) || b.Source != Source || len(b.Windows) < 1 || len(b.Windows) > 96 {
 		return result, ErrInvalid
@@ -107,6 +118,9 @@ func (s *Store) Ingest(ctx context.Context, tenant string, b Batch, now time.Tim
 		return result, err
 	}
 	defer tx.Rollback()
+	if err = lockScope(ctx, tx, tenant); err != nil {
+		return result, err
+	}
 	r, err := tx.ExecContext(ctx, `INSERT INTO traffic_batches_v1(tenant,id,fingerprint,inserted) VALUES($1,$2,$3,0) ON CONFLICT DO NOTHING`, tenant, b.ID, fp)
 	if err != nil {
 		return result, err
@@ -125,6 +139,14 @@ func (s *Store) Ingest(ctx context.Context, tenant string, b Batch, now time.Tim
 		}
 		result.Replayed = true
 		return result, nil
+	}
+	if replace {
+		if _, err = tx.ExecContext(ctx, `DELETE FROM traffic_windows_v1 WHERE tenant=$1`, tenant); err != nil {
+			return result, err
+		}
+		if _, err = tx.ExecContext(ctx, `DELETE FROM traffic_batches_v1 WHERE tenant=$1 AND id<>$2`, tenant, b.ID); err != nil {
+			return result, err
+		}
 	}
 	for _, w := range b.Windows {
 		r, err = tx.ExecContext(ctx, `INSERT INTO traffic_windows_v1(tenant,source,zone,start_ms,observations) VALUES($1,$2,$3,$4,$5) ON CONFLICT DO NOTHING`, tenant, b.Source, w.Zone, w.Start, w.Count)
@@ -149,6 +171,52 @@ func (s *Store) Ingest(ctx context.Context, tenant string, b Batch, now time.Tim
 	}
 	if _, err = tx.ExecContext(ctx, `UPDATE traffic_batches_v1 SET inserted=$1 WHERE tenant=$2 AND id=$3`, result.Inserted, tenant, b.ID); err != nil {
 		return result, err
+	}
+	return result, tx.Commit()
+}
+
+// Both imports and demo clearing acquire this database-backed lock. A reset
+// cannot remove a concurrent import's windows while leaving its replay ledger.
+// The short transaction serializes writes only within one sample namespace.
+func lockScope(ctx context.Context, tx *sql.Tx, tenant string) error {
+	_, err := tx.ExecContext(ctx, `INSERT INTO traffic_scopes_v1(tenant) VALUES($1) ON CONFLICT(tenant) DO UPDATE SET tenant=excluded.tenant`, tenant)
+	return err
+}
+
+type EmptyResult struct {
+	Batches int64 `json:"removed_batches"`
+	Windows int64 `json:"removed_windows"`
+}
+
+// EmptySample removes this sample's synthetic observations and replay records
+// together. HTTP access is enabled only by the explicit demo handler.
+func (s *Store) EmptySample(ctx context.Context, tenant string) (EmptyResult, error) {
+	var result EmptyResult
+	if !identity.MatchString(tenant) {
+		return result, ErrInvalid
+	}
+	tx, err := s.DB.BeginTx(ctx, nil)
+	if err != nil {
+		return result, err
+	}
+	defer tx.Rollback()
+	if err = lockScope(ctx, tx, tenant); err != nil {
+		return result, err
+	}
+	for _, operation := range []struct {
+		query string
+		count *int64
+	}{
+		{`DELETE FROM traffic_windows_v1 WHERE tenant=$1`, &result.Windows},
+		{`DELETE FROM traffic_batches_v1 WHERE tenant=$1`, &result.Batches},
+	} {
+		r, err := tx.ExecContext(ctx, operation.query, tenant)
+		if err != nil {
+			return EmptyResult{}, err
+		}
+		if *operation.count, err = r.RowsAffected(); err != nil {
+			return EmptyResult{}, err
+		}
 	}
 	return result, tx.Commit()
 }

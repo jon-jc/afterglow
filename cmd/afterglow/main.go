@@ -100,7 +100,7 @@ func run() error {
 		if err = traffic.Migrate(startup); err != nil {
 			return err
 		}
-		api.FootTraffic = traffic.Handler(tenant)
+		api.FootTraffic = traffic.DemoHandler(tenant)
 	}
 	api.Airports = httpapi.AirportCatalog(env("AIRPORT_SERVICE_URL", "http://127.0.0.1:8091"))
 	reg := prometheus.NewRegistry()

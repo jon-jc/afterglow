@@ -2451,6 +2451,9 @@ td .text-link.mono {
 .traffic-samples p { margin: 0 0 7px; font-size: 13px; line-height: 1.6; }
 .traffic-samples small, .traffic-freshness { color: var(--muted); font-size: 12px; line-height: 1.6; }
 .traffic-freshness { margin: 0 0 16px; }
+.traffic-generate { margin-top: 14px; }
+.traffic-empty { margin: 20px 0; }
+.traffic-empty h2 { color: var(--text); margin-top: 0; }
 .traffic-samples select:focus-visible { outline: 2px solid var(--lime); outline-offset: 3px; }
 .traffic-zone {
   min-width: 0;
