@@ -115,6 +115,8 @@ docs                Design, research, operations and interview walkthrough
 
 ## Interview walkthrough
 
+Two separate, printable study pages: [interview preparation and Fluxgate notes](docs/interview-prep.html) and [click-by-click Afterglow walkthrough](docs/afterglow-walkthrough.html). Open them directly as local HTML files; neither is served by the product.
+
 The [chosen staging route](docs/staging-route.md) includes a measured PostgreSQL recovery rehearsal and explains the remaining cloud validation gates.
 
 Open the [standalone HTML study guide](docs/interview-notes.html) directly as a local file. It is not embedded in or served by the product. It connects Fluxgate to Afterglow with speaking notes, architecture explanations, expandable technical answers, a demo script and a rehearsal checklist.
