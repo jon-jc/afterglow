@@ -59,10 +59,13 @@ async function request(path, body, headers = {}) {
     body: body === undefined ? undefined : JSON.stringify(body),
   });
   const data = await response.json().catch(() => null);
-  if (!response.ok)
-    throw new Error(
+  if (!response.ok) {
+    const error = new Error(
       data?.detail || `Request failed (${response.status}). Please try again.`,
     );
+    error.status = response.status;
+    throw error;
+  }
   if (data === null)
     throw new Error(
       "The server returned an unreadable response. Please retry.",

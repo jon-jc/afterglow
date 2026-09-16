@@ -10,6 +10,7 @@
     }
     throw new Error("Timed out");
   };
+  location.hash = "intake";
   await wait(() => document.querySelector("#intake-price"));
   const setPrice = (v) => {
     const el = document.querySelector("#intake-price");
