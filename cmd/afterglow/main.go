@@ -15,6 +15,7 @@ import (
 
 	"github.com/jon-jc/afterglow/internal/console"
 	"github.com/jon-jc/afterglow/internal/core"
+	"github.com/jon-jc/afterglow/internal/foottraffic"
 	"github.com/jon-jc/afterglow/internal/httpapi"
 	"github.com/jon-jc/afterglow/internal/pipeline"
 	"github.com/jon-jc/afterglow/internal/telemetry"
@@ -94,6 +95,13 @@ func run() error {
 	api := &httpapi.Server{Store: store, Tenant: tenant, APIKey: os.Getenv("API_KEY"), Demo: demo, Ready: func() bool { return !draining.Load() }}
 	api.PreviousAPIKey = previousKey
 	api.Static = console.Handler()
+	if demo {
+		traffic := &foottraffic.Store{DB: store.DB}
+		if err = traffic.Migrate(startup); err != nil {
+			return err
+		}
+		api.FootTraffic = traffic.Handler(tenant)
+	}
 	api.Airports = httpapi.AirportCatalog(env("AIRPORT_SERVICE_URL", "http://127.0.0.1:8091"))
 	reg := prometheus.NewRegistry()
 	worker := pipeline.New(store, reg)

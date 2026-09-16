@@ -24,6 +24,7 @@ const time = (n) =>
   });
 const title = (s) => s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const views = {
+  "foot-traffic": "Foot traffic",
   assurance: "Campaign assurance",
   proof: "Live integration proof",
   intake: "Partner intake",
@@ -529,6 +530,7 @@ function render() {
     return;
   if (next === "proof" && active === "proof" && $("#integration-proof")) return;
   if (next === "intake" && active === "intake" && $("#partner-intake")) return;
+  if (next === "foot-traffic" && active === "foot-traffic" && $("#foot-traffic")) return;
   if (["ledger-search", "ledger-sort"].includes(focus?.id) && next === active) {
     $("#ledger-results").innerHTML = ledgerResults();
     return;
@@ -558,6 +560,7 @@ function render() {
   document.title = `${views[active]} — Afterglow`;
   $(".synthetic-pill").textContent = "SYNTHETIC DATA";
   $("#main").innerHTML = {
+    "foot-traffic": footTraffic.render,
     assurance: campaignAssurance.render,
     proof: integrationProof.render,
     intake: partnerIntake.render,
