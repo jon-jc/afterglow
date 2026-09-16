@@ -30,7 +30,7 @@
     return original(...args);
   };
   try {
-    for (const v of ["", "0", "-1", "1.001", "1e2", "1000.01"]) {
+    for (const v of ["", "0", "-1", "1.001", "1e2", "10.01"]) {
       setPrice(v);
       await load();
       check(calls === 0, "Invalid price created hold: " + v);
@@ -72,7 +72,11 @@
           r.id === second && r.state === "settled" && r.cost_micros === 370000,
       );
     });
+    setPrice("10.00");
+    await load();
+    check(document.querySelector("#intake-status").textContent.includes("Example ready. A $10.00"), "Upper boundary accepted");
     return {
+      demoCap: 10,
       passed: true,
       invalidPrices: 6,
       exactPrice: true,
