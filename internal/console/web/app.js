@@ -24,7 +24,7 @@ const time = (n) =>
   });
 const title = (s) => s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const views = {
-  airports: "Airports",
+  intake: "Partner intake",
   overview: "Overview",
   campaigns: "Campaigns",
   ledger: "Delivery ledger",
@@ -199,7 +199,7 @@ function network() {
     })
     .join(
       "",
-    )}</svg><div class="map-caption">ILLUSTRATIVE GEOGRAPHY · SYNTHETIC INVENTORY</div></div><div class="map-footer"><div class="legend"><span><i></i>Demo screen</span><span><i class="dim"></i>${new Set(pts.map((s) => s.market)).size} markets</span></div><a class="text-link" href="#airports">Explore all airports ↗</a></div></section>`;
+    )}</svg><div class="map-caption">ILLUSTRATIVE GEOGRAPHY · SYNTHETIC INVENTORY</div></div><div class="map-footer"><div class="legend"><span><i></i>Demo screen</span><span><i class="dim"></i>${new Set(pts.map((s) => s.market)).size} markets</span></div><a class="text-link" href="#intake">Inspect partner intake ↗</a></div></section>`;
 }
 function flow() {
   const c = state.counts,
@@ -415,8 +415,7 @@ function render() {
   const next = Object.hasOwn(views, location.hash.slice(1))
     ? location.hash.slice(1)
     : "overview";
-  if (next === "airports" && active === "airports" && $("#airport-explorer"))
-    return;
+  if (next === "intake" && active === "intake" && $("#partner-intake")) return;
   if (focus?.id === "ledger-search" && next === active) {
     $("#ledger-results").innerHTML =
       ledgerTable(filtered()) +
@@ -442,10 +441,9 @@ function render() {
     else a.removeAttribute("aria-current");
   });
   $("#breadcrumb-view").textContent = views[active];
-  $(".synthetic-pill").textContent =
-    active === "airports" ? "AIRPORT REFERENCE DATA" : "SYNTHETIC DATA";
+  $(".synthetic-pill").textContent = "SYNTHETIC DATA";
   $("#main").innerHTML = {
-    airports: airportExplorer.render,
+    intake: partnerIntake.render,
     overview,
     campaigns,
     ledger,

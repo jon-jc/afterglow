@@ -14,112 +14,6 @@
   font-family: "Segoe UI", Inter, Arial, sans-serif;
   font-synthesis: none;
 }
-.airport-filters {
-  align-items: end;
-  gap: 18px;
-}
-.airport-filters label:first-child {
-  flex: 1;
-}
-.airport-filters input {
-  min-width: 180px;
-}
-.airport-summary {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1.6fr;
-  gap: 16px;
-  margin: 24px 0;
-}
-.airport-summary > div {
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 20px;
-  background: var(--panel);
-}
-.airport-summary strong {
-  font-size: 26px;
-  font-weight: 500;
-  display: block;
-  margin-bottom: 8px;
-}
-.airport-summary > div:last-child strong {
-  font-size: 19px;
-}
-.airport-summary span {
-  font-size: 11px;
-  color: #a1b0b5;
-}
-.airport-map {
-  width: 100%;
-  max-height: 620px;
-  display: block;
-  padding: 18px;
-}
-.airport-map text {
-  fill: #a5b6bc;
-  font: 10px monospace;
-  letter-spacing: 1px;
-}
-.airport-inset {
-  fill: #10181c;
-  stroke: #34434a;
-}
-.airport-point {
-  fill: #c5ed85;
-  opacity: 0.8;
-  cursor: pointer;
-}
-.airport-point:hover {
-  stroke: white;
-  stroke-width: 3;
-  opacity: 1;
-}
-.airport-directory {
-  margin-top: 22px;
-}
-.airport-directory .text-link {
-  text-align: left;
-  line-height: 1.6;
-}
-.airport-code {
-  display: block;
-  color: #93a7ae;
-  margin-top: 5px;
-  font: 11px monospace;
-}
-.airport-source {
-  font-size: 12px;
-  line-height: 1.8;
-  color: #9aabb1;
-  margin: 20px 0;
-}
-.airport-source a {
-  color: var(--lime);
-  text-decoration: underline;
-}
-#airport-loading {
-  font-size: 12px;
-  color: var(--lime);
-  padding-bottom: 10px;
-}
-@media (max-width: 700px) {
-  .airport-summary {
-    grid-template-columns: 1fr 1fr;
-  }
-  .airport-summary > div:last-child {
-    grid-column: 1 / -1;
-  }
-  .airport-filters label {
-    width: 100%;
-  }
-  .airport-directory .panel-header {
-    flex-wrap: wrap;
-    gap: 15px;
-  }
-  .airport-map {
-    padding: 8px;
-  }
-}
 * {
   box-sizing: border-box;
 }
@@ -1469,5 +1363,58 @@ label select {
   * {
     animation: none !important;
     transition: none !important;
+  }
+}
+
+.intake-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 22px;
+}
+.intake-card {
+  padding: 24px;
+  min-width: 0;
+}
+.intake-card p {
+  color: var(--muted);
+  line-height: 1.7;
+}
+.intake-card textarea {
+  width: 100%;
+  min-height: 330px;
+  resize: vertical;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  font: 12px/1.7 monospace;
+  margin: 12px 0;
+}
+.intake-card textarea:focus {
+  outline: 2px solid var(--lime);
+}
+.intake-card .actions {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+.intake-result {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.intake-result small {
+  display: block;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.intake-status {
+  min-height: 24px;
+  color: var(--amber);
+  line-height: 1.6;
+}
+@media (max-width: 1000px) {
+  .intake-grid {
+    grid-template-columns: 1fr;
   }
 }

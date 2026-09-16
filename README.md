@@ -28,7 +28,7 @@ Open **http://127.0.0.1:8090** and click **Simulate traffic**. The local run use
 
 **GoLand:** open this folder, let the Go module index, and run the checked-in **Afterglow** configuration. Set breakpoints in `Reserve`, `Accept`, and `Process`. Windows users can also run `./scripts/start.ps1`.
 
-**Airport catalog:** start `go run ./cmd/airports` in a second terminal (or the **Airport Catalog** GoLand configuration), then choose **Airports**. The separate Go service fetches all source-listed US scheduled-service airports and territories, with search, region filters, map, pagination and a persistent last-good snapshot. [Coverage, source and architecture](docs/airports.md).
+**Partner intake:** reserve a play in Campaigns, then open **Partner intake** to send a mixed batch to the Go API. Inspect per-item results, retry unchanged identities, and follow asynchronous decisions in the ledger. The optional airport reference service remains a standalone backend experiment; its console section has been removed.
 
 For PostgreSQL plus the official Pub/Sub emulator, see [operations](docs/operations.md). `TRANSPORT=pubsub` uses the Google Go v2 client. The local transport never claims to be Pub/Sub.
 
