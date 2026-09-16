@@ -767,7 +767,10 @@ $("#detail-dialog").addEventListener("click", (e) => {
       e.target.close();
   }
 });
-$("#refresh").addEventListener("click", refresh);
+$("#refresh").addEventListener("click", () => {
+  refresh();
+  if (active === "foot-traffic") footTraffic.refresh();
+});
 $(".skip-link").addEventListener("click", (e) => {
   e.preventDefault();
   $("#main").focus();

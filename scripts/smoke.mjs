@@ -179,6 +179,20 @@ try {
   assert.equal(rejected.status, 400);
   assert.equal(spent((await req("/api/v1/snapshot")).data), spent(s));
   checks.push("Foot-traffic batch replay, suppression and settlement isolation");
+  for (const sample of ["busy", "gaps", "quiet"]) {
+    const query = `?scenario=${sample}`;
+    const feed = (await req(`/api/v1/foot-traffic/example${query}`)).data;
+    assert.equal((await req(`/api/v1/foot-traffic/batches${query}`, feed)).status, 201);
+    const report = (await req(`/api/v1/foot-traffic/report${query}`)).data;
+    assert.equal((await req(`/api/v1/foot-traffic/batches${query}`, feed)).status, 200);
+    assert.deepEqual((await req(`/api/v1/foot-traffic/report${query}`)).data.zones, report.zones);
+    if (sample === "busy") assert.equal(report.released_windows, 24);
+    if (sample === "gaps") assert.equal(report.missing_windows, 9);
+    if (sample === "quiet") assert.equal(report.suppressed_windows, 18);
+  }
+  assert.equal((await req("/api/v1/foot-traffic/report")).data.published_observations, traffic.data.published_observations);
+  assert.equal(spent((await req("/api/v1/snapshot")).data), spent(s));
+  checks.push("Four isolated sample feeds retain counts across refresh and replay");
   mkdirSync(path.join(root, "artifacts"), { recursive: true });
   const report = {
     passed: true,
