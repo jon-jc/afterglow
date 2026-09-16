@@ -2290,3 +2290,101 @@ td .text-link.mono {
 #ledger-results {
   scroll-margin-top: 85px;
 }
+
+.assurance-selector {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin: 10px 0 24px;
+  flex-wrap: wrap;
+}
+.assurance-selector label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.assurance-selector select {
+  min-width: 250px;
+  min-height: 44px;
+}
+.assurance-selector > span {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 11px;
+}
+.assurance-verdict {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border: 1px solid #42563a;
+  border-radius: 12px;
+  padding: 22px;
+  background: linear-gradient(110deg, #263321, #171f1c);
+  margin-bottom: 22px;
+}
+.assurance-verdict > span {
+  font-size: 27px;
+  color: var(--lime);
+}
+.assurance-verdict strong {
+  font-size: 15px;
+  font-weight: 500;
+}
+.assurance-verdict small {
+  display: block;
+  color: #afbea8;
+  font-size: 11px;
+  margin-top: 8px;
+  line-height: 1.8;
+}
+.assurance-verdict.mismatch {
+  background: #38251f;
+  border-color: #9e654b;
+}
+.assurance-actions {
+  margin-top: 24px;
+}
+.assurance-action {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  padding: 21px 24px;
+  border-top: 1px solid var(--line);
+}
+.assurance-action > div {
+  flex: 1;
+}
+.assurance-action h3 {
+  font-size: 14px;
+  font-weight: 500;
+  margin: 0 0 8px;
+}
+.assurance-action p {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin: 0;
+  max-width: 850px;
+}
+.assurance-scope {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.9;
+  margin-top: 22px;
+}
+@media (max-width: 600px) {
+  .assurance-selector select {
+    width: 100%;
+    min-width: 0;
+  }
+  .assurance-selector > span {
+    margin-left: 0;
+  }
+  .assurance-action {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 18px;
+  }
+  .assurance-verdict {
+    padding: 18px;
+  }
+}

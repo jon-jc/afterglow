@@ -24,6 +24,7 @@ const time = (n) =>
   });
 const title = (s) => s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const views = {
+  assurance: "Campaign assurance",
   proof: "Live integration proof",
   intake: "Partner intake",
   overview: "Overview",
@@ -508,6 +509,12 @@ function render() {
   const next = Object.hasOwn(views, location.hash.slice(1))
     ? location.hash.slice(1)
     : "overview";
+  if (
+    next === "assurance" &&
+    active === "assurance" &&
+    $("#campaign-assurance")
+  )
+    return;
   if (next === "proof" && active === "proof" && $("#integration-proof")) return;
   if (next === "intake" && active === "intake" && $("#partner-intake")) return;
   if (["ledger-search", "ledger-sort"].includes(focus?.id) && next === active) {
@@ -539,6 +546,7 @@ function render() {
   document.title = `${views[active]} — Afterglow`;
   $(".synthetic-pill").textContent = "SYNTHETIC DATA";
   $("#main").innerHTML = {
+    assurance: campaignAssurance.render,
     proof: integrationProof.render,
     intake: partnerIntake.render,
     overview,
