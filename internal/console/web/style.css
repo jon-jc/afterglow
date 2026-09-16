@@ -2388,3 +2388,33 @@ td .text-link.mono {
     padding: 18px;
   }
 }
+
+.inline-proof {
+  margin-bottom: 24px;
+}
+.inline-proof .panel-header {
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.inline-proof-body {
+  padding: 0 24px 24px;
+}
+.inline-proof-steps {
+  padding: 0;
+  list-style: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 24px;
+}
+.inline-proof-evidence {
+  margin: 20px 0;
+  overflow-x: auto;
+}
+@media (max-width: 600px) {
+  .inline-proof-steps {
+    grid-template-columns: 1fr;
+  }
+  .inline-proof-body {
+    padding: 0 16px 20px;
+  }
+}

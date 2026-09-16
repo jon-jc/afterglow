@@ -95,15 +95,18 @@ const campaignAssurance = (() => {
       heading(
         "Delivery you can stand behind.",
         "Connect campaign budgets to verified plays, screen-level delivery and operational follow-up.",
-        `<button class="button" data-assurance-export ${!report || loading || error ? 'disabled' : ''}>Export report ↓</button><button class="button primary" data-assurance-refresh>Refresh report ↻</button>`,
+        `<button class="button" data-assurance-export ${!report || loading || error ? "disabled" : ""}>Export report ↓</button><button class="button primary" data-assurance-refresh>Refresh report ↻</button>`,
         "CAMPAIGN ASSURANCE",
       ) +
-      `<div id="campaign-assurance"><div class="assurance-selector"><label for="assurance-campaign">Campaign</label><select id="assurance-campaign">${state.campaigns.map((c) => `<option value="${esc(c.id)}" ${c.id === selected ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select><span>Snapshot report · refresh to update</span></div><div id="assurance-report">${content()}</div></div>`
+      `<div id="campaign-assurance"><div class="assurance-selector"><label for="assurance-campaign">Campaign</label><select id="assurance-campaign">${state.campaigns.map((c) => `<option value="${esc(c.id)}" ${c.id === selected ? "selected" : ""}>${esc(c.name)}</option>`).join("")}</select><span>Snapshot report · refresh to update</span></div>${integrationProof.renderInline(selected)}<div id="assurance-report">${content()}</div></div>`
     );
   }
   document.addEventListener("change", (e) => {
     if (e.target.id === "assurance-campaign") {
       selected = e.target.value;
+      const panel = $("#inline-proof");
+      if (panel) panel.dataset.campaign = selected;
+      integrationProof.updateInline();
       fetchReport();
     }
   });
@@ -126,6 +129,9 @@ const campaignAssurance = (() => {
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     }
+  });
+  document.addEventListener("afterglow:proof-complete", () => {
+    if ($("#campaign-assurance")) fetchReport();
   });
   return { render };
 })();
