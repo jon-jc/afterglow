@@ -1,6 +1,7 @@
 "use strict";
 (() => {
   const pages = [
+    ["foot-traffic", "◈", "Foot traffic", "Aggregate observation windows, coverage and comparisons"],
     [
       "assurance",
       "✓",

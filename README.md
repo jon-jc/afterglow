@@ -18,6 +18,10 @@ Afterglow gives those ambiguities explicit outcomes: settled, duplicate, quarant
 
 This is an independent, production-oriented engineering demo with synthetic campaigns and inventory. It is not a CCO product, a certified Vistar integration, a real billing system, or an audience-attribution model. [Research and public sources](docs/research.md).
 
+## Foot-traffic measurement
+
+Open **Foot traffic** to import a synthetic partner feed, compare fixed hourly zones, inspect coverage and suppressed counts, and replay a batch without adding observations twice. The Go service also has a standalone entry point. [Contract, limitations and GCP direction](docs/foot-traffic.md).
+
 ## Start with a double-click (Windows)
 
 Double-click **Start Afterglow.cmd** in this folder. It prepares the app, starts it in the background, and opens your browser. Clicking it again reopens the running app. You can close the launcher window.
@@ -114,4 +118,3 @@ deploy/terraform   Cloud Run, Pub/Sub, IAM and existing SQL/secret bindings
 scripts             Local launch and isolated end-to-end verification
 docs                Design, research, operations and interview walkthrough
 ```
-

@@ -28,6 +28,7 @@ type Server struct {
 	DemoHandler    http.Handler
 	Metrics        http.Handler
 	Airports       http.Handler
+	FootTraffic    http.Handler
 	Runtime        func() any
 	Ready          func() bool
 	mu             sync.Mutex
@@ -37,6 +38,13 @@ type Server struct {
 
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/foot-traffic/", func(w http.ResponseWriter, r *http.Request) {
+		if s.FootTraffic == nil {
+			problem(w, 503, "foot_traffic_service_not_configured")
+			return
+		}
+		s.FootTraffic.ServeHTTP(w, r)
+	})
 	mux.HandleFunc("GET /api/v1/airports", func(w http.ResponseWriter, r *http.Request) {
 		if s.Airports == nil {
 			problem(w, 503, "airport_service_not_configured")

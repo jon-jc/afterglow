@@ -159,6 +159,26 @@ try {
   assert.equal(again.data.id, first.data.id);
   assert.equal(conflict.status, 409);
   checks.push("HTTP idempotent replay and conflict");
+  const feed = await req("/api/v1/foot-traffic/example");
+  assert.equal(feed.status, 200);
+  const imported = await req("/api/v1/foot-traffic/batches", feed.data);
+  assert.equal(imported.status, 201);
+  const traffic = await req("/api/v1/foot-traffic/report");
+  assert.equal(traffic.status, 200);
+  assert.equal(traffic.data.zones.length, 4);
+  assert.equal(traffic.data.released_windows + traffic.data.suppressed_windows, 24);
+  const replayed = await req("/api/v1/foot-traffic/batches", feed.data);
+  assert.equal(replayed.status, 200);
+  assert.equal(replayed.data.replayed, true);
+  const afterReplay = await req("/api/v1/foot-traffic/report");
+  assert.equal(afterReplay.data.published_observations, traffic.data.published_observations);
+  for (const zone of traffic.data.zones)
+    for (const cell of [...zone.current, ...zone.previous])
+      assert.ok(cell.status === "reported" ? cell.observations >= 20 : cell.observations === null);
+  const rejected = await req("/api/v1/foot-traffic/batches", {...feed.data, device_id: "unsupported"});
+  assert.equal(rejected.status, 400);
+  assert.equal(spent((await req("/api/v1/snapshot")).data), spent(s));
+  checks.push("Foot-traffic batch replay, suppression and settlement isolation");
   mkdirSync(path.join(root, "artifacts"), { recursive: true });
   const report = {
     passed: true,

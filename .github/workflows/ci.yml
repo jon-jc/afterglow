@@ -31,7 +31,7 @@ jobs:
       - run: go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 ./...
       - run: go test -race -count=1 ./...
       - name: PostgreSQL concurrency and reconciliation
-        run: go test -race -count=1 ./internal/core
+        run: go test -race -count=1 ./internal/core ./internal/foottraffic
         env:
           TEST_DATABASE_URL: postgres://afterglow:local-test-only@localhost:5432/afterglow?sslmode=disable
       - run: go build ./cmd/afterglow
