@@ -113,14 +113,3 @@ scripts             Local launch and isolated end-to-end verification
 docs                Design, research, operations and interview walkthrough
 ```
 
-## Interview walkthrough
-
-The [chosen staging route](docs/staging-route.md) includes a measured PostgreSQL recovery rehearsal and explains the remaining cloud validation gates.
-
-Open the [standalone HTML study guide](docs/interview-notes.html) directly as a local file. It is not embedded in or served by the product. It connects Fluxgate to Afterglow with speaking notes, architecture explanations, expandable technical answers, a demo script and a rehearsal checklist.
-
-Read the [five-minute demo and engineering discussion guide](docs/interview.md). It covers three concrete examples, trade-offs, genuine-teamwork prompts and four questions for the hiring manager.
-
-[Production release gates and deployment sequence](docs/production-readiness.md) document verified controls and remaining launch evidence. Protected mode requires PostgreSQL and a separately migrated schema.
-
-Next production steps include a vendor-certified adapter, authenticated player evidence, real catalog synchronization, a complete campaign lifecycle, staging migration/credential-rotation drills, retention policies, and measured load/restore tests. The [operations guide](docs/operations.md) keeps those limits explicit.
