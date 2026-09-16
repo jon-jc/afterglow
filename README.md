@@ -16,7 +16,15 @@ Afterglow gives those ambiguities explicit outcomes: settled, duplicate, quarant
 
 This is an independent, production-oriented engineering demo with synthetic campaigns and inventory. It is not a CCO product, a certified Vistar integration, a real billing system, or an audience-attribution model. [Research and public sources](docs/research.md).
 
-## Run in 30 seconds
+## Start with a double-click (Windows)
+
+Double-click **Start Afterglow.cmd** in this folder. It prepares the app, starts it in the background, and opens your browser. Clicking it again reopens the running app. You can close the launcher window.
+
+Double-click **Stop Afterglow.cmd** to stop the local app. Your saved data stays in the `data` folder. Go 1.27+ must be installed for a fresh start; no Docker or Node setup is needed. If another application occupies port 8090, the launcher explains the conflict without stopping it. Startup logs are in `artifacts/launcher-8090*.log`.
+
+The launcher is for the local SQLite demo. It explicitly selects local transport and does not use deployment database credentials. To rebuild after editing code, stop and start again.
+
+## Run from a terminal
 
 Requires Go 1.27 or later (aligned with the verified security scan and container build).
 
@@ -24,7 +32,7 @@ Requires Go 1.27 or later (aligned with the verified security scan and container
 go run ./cmd/afterglow
 ```
 
-Open **http://127.0.0.1:8090** and click **Simulate traffic**. The local run uses persistent SQLite and a SQL-backed worker queue. It requires no cloud account, Docker, frontend build or Node runtime.
+Open **http://127.0.0.1:8090** and choose **Live proof**. The local run uses persistent SQLite and a SQL-backed worker queue. It requires no cloud account, Docker, frontend build or Node runtime.
 
 **GoLand:** open this folder, let the Go module index, and run the checked-in **Afterglow** configuration. Set breakpoints in `Reserve`, `Accept`, and `Process`. Windows users can also run `./scripts/start.ps1`.
 
