@@ -63,24 +63,31 @@
     await submit();
     check(
       requests[3].key === requests[2].key &&
-        !document.querySelector("dialog").open,
+        !document.querySelector("#detail-dialog").open,
       "Successful retry closes the dialog without changing identity",
     );
     document.querySelector('[data-action="reserve"]').click();
     const pendingForm = document.querySelector("#reserve-form");
     let finishRequest;
-    window.fetch = (url, options) => url === "/api/v1/reservations"
-      ? new Promise(resolve => { finishRequest = resolve; })
-      : originalFetch(url, options);
+    window.fetch = (url, options) =>
+      url === "/api/v1/reservations"
+        ? new Promise((resolve) => {
+            finishRequest = resolve;
+          })
+        : originalFetch(url, options);
     pendingForm.requestSubmit();
     await waitFor(() => finishRequest);
-    document.querySelector("dialog").close();
+    document.querySelector("#detail-dialog").close();
     document.querySelector('[data-action="reserve"]').click();
     const replacement = document.querySelector("#reserve-form");
     finishRequest(new Response("{}", { status: 200 }));
     await waitFor(() => !pendingForm.querySelector("button").disabled);
-    check(replacement !== pendingForm && document.querySelector("dialog").open, "An old request cannot close a newly opened dialog");
-    document.querySelector("dialog").close();
+    check(
+      replacement !== pendingForm &&
+        document.querySelector("#detail-dialog").open,
+      "An old request cannot close a newly opened dialog",
+    );
+    document.querySelector("#detail-dialog").close();
     window.fetch = originalFetch;
     location.hash = "ledger";
     await waitFor(() => document.querySelector("#ledger-search"));
@@ -125,6 +132,6 @@
     return { passed: checks.length, checks };
   } finally {
     window.fetch = originalFetch;
-    document.querySelector("dialog").close();
+    document.querySelector("#detail-dialog").close();
   }
 })();

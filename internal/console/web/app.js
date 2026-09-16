@@ -40,7 +40,12 @@ let state = null,
   search = "",
   busy = false,
   toastTimer,
-  refreshing = false;
+  refreshing = false,
+  livePaused = false,
+  lastUpdated = null,
+  connectionLost = false,
+  ledgerPage = 0,
+  ledgerSort = "newest";
 async function request(path, body, headers = {}) {
   const response = await fetch(path, {
     signal: AbortSignal.timeout(12000),
@@ -91,8 +96,13 @@ async function refresh() {
     $("#recovery-badge").textContent = num(
       (state.counts.quarantined || 0) + (state.counts.failed || 0),
     );
+    lastUpdated = new Date();
+    connectionLost = false;
+    freshness();
     render();
   } catch (e) {
+    connectionLost = true;
+    freshness();
     $("#connection-label").textContent = "Connection lost";
     $("#connection-dot").classList.add("bad");
     if (!state)
@@ -102,6 +112,66 @@ async function refresh() {
     refreshing = false;
   }
 }
+function freshness() {
+  const banner = $("#freshness-banner");
+  banner.hidden = !connectionLost && !livePaused;
+  banner.textContent = `${connectionLost ? "Connection interrupted. Showing the last successful snapshot." : livePaused ? "Automatic updates paused. The engine continues processing; refresh manually or resume updates." : ""}${lastUpdated && (connectionLost || livePaused) ? ` Last updated ${lastUpdated.toLocaleTimeString()}.` : ""}`;
+  $("#refresh").title = lastUpdated
+    ? `Refresh data · last updated ${lastUpdated.toLocaleTimeString()}`
+    : "Refresh data";
+}
+$("#live-toggle").addEventListener("click", () => {
+  livePaused = !livePaused;
+  $("#live-toggle").setAttribute("aria-pressed", String(livePaused));
+  $("#live-toggle").innerHTML = livePaused
+    ? "▶ <span>Resume updates</span>"
+    : "Ⅱ <span>Pause updates</span>";
+  $("#live-toggle").title = livePaused
+    ? "Resume automatic updates"
+    : "Pause automatic updates";
+  $("#live-toggle").setAttribute("aria-label", $("#live-toggle").title);
+  freshness();
+  if (!livePaused) refresh();
+});
+document.addEventListener("change", (e) => {
+  if (e.target.id === "ledger-sort") {
+    ledgerSort = e.target.value;
+    ledgerPage = 0;
+    render();
+  }
+});
+document.addEventListener("click", (e) => {
+  const page = e.target.closest("[data-ledger-page]");
+  if (page && !page.disabled) {
+    ledgerPage += page.dataset.ledgerPage === "next" ? 1 : -1;
+    render();
+  }
+  if (e.target.closest("[data-clear-filters]")) {
+    search = "";
+    filter = "all";
+    ledgerPage = 0;
+    render();
+    $("#ledger-search")?.focus();
+  }
+  if (e.target.closest("[data-export-receipts]")) {
+    const report = {
+      scope: "Matches within the latest 100 receipts, not the full ledger",
+      observed_at: lastUpdated?.toISOString(),
+      filter,
+      search,
+      receipts: filtered(),
+    };
+    const url = URL.createObjectURL(
+      new Blob([JSON.stringify(report, null, 2)], { type: "application/json" }),
+    );
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "afterglow-receipts.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    toast(`Exported ${report.receipts.length} matching receipts.`);
+  }
+});
 function badge(status) {
   return `<span class="badge ${esc(status)}">${status === "settled" ? "✓ " : status === "duplicate" ? "↪ " : status === "quarantined" || status === "failed" ? "! " : ""}${esc(title(status))}</span>`;
 }
@@ -244,13 +314,13 @@ function ledgerTable(data, compact = false) {
     !data.length &&
     (search || (!compact && active === "ledger" && filter !== "all"))
   )
-    return '<div class="empty"><strong>No matching receipts.</strong>Try a different search or clear your filters.</div>';
+    return '<div class="empty"><strong>No matching receipts.</strong>Try a different search or <button class="text-link" data-clear-filters>clear your filters</button>.</div>';
   if (!data.length)
     return `<div class="empty"><strong>${active === "recovery" ? "Nothing needs recovery." : "Your next play starts here."}</strong>${active === "recovery" ? "Run the schema or retry scenario in the failure lab to inspect a rejected delivery." : "Simulate traffic to create real reservations and reconcile playback receipts."}</div>`;
-  return `<div class="table-wrap"><table><thead><tr><th>RECEIPT / SCREEN</th>${compact ? "" : "<th>RESERVATION</th><th>PLAYED AT</th>"}<th>DECISION</th><th>${compact ? "RECEIVED" : "ATTEMPTS"}</th></tr></thead><tbody>${data.map((d) => `<tr><td><button class="text-link mono" data-delivery="${d.id}">${esc(d.event_id.slice(0, 8))}<span class="muted">… ↗</span></button><div class="muted" style="font-size:9px;margin-top:5px">${esc(d.screen_id.toUpperCase())}</div></td>${compact ? "" : `<td class="mono muted">${esc(d.reservation_id.slice(0, 12))}…</td><td class="mono">${time(d.played_at)}</td>`}<td>${badge(d.status)}</td><td class="mono muted">${compact ? time(d.received_at) : d.attempts}</td></tr>`).join("")}</tbody></table></div>`;
+  return `<div class="table-wrap"><table><thead><tr><th>RECEIPT / SCREEN</th>${compact ? "" : "<th>RESERVATION</th><th>PLAYED AT</th>"}<th>DECISION</th><th>${compact ? "RECEIVED" : "ATTEMPTS"}</th></tr></thead><tbody>${data.map((d) => `<tr><td data-label="Receipt / screen"><button class="text-link mono" data-delivery="${d.id}">${esc(d.event_id.slice(0, 8))}<span class="muted">… ↗</span></button><div class="muted" style="font-size:9px;margin-top:5px">${esc(d.screen_id.toUpperCase())}</div></td>${compact ? "" : `<td data-label="Reservation" class="mono muted">${esc(d.reservation_id.slice(0, 12))}…</td><td data-label="Played at" class="mono" title="${esc(new Date(d.played_at).toLocaleString())}">${time(d.played_at)}</td>`}<td data-label="Decision">${badge(d.status)}${!compact && ["quarantined", "failed"].includes(d.status) ? `<small class="decision-reason">${esc(title(d.reason || "Inspect receipt for details"))}</small>` : ""}</td><td data-label="${compact ? "Received" : "Attempts"}" class="mono muted">${compact ? time(d.received_at) : d.attempts}</td></tr>`).join("")}</tbody></table></div>`;
 }
 function recent() {
-  return `<section class="panel"><div class="panel-header"><div><h2>Latest decisions</h2><p>Follow the evidence behind every play</p></div><a class="button quiet" href="#ledger">Open ledger ↗</a></div>${ledgerTable(state.deliveries.slice(0, 3), true)}<div class="table-foot"><span>Updates every 2 seconds</span><span>Persisted decisions, live view <span class="status-dot"></span></span></div></section>`;
+  return `<section class="panel"><div class="panel-header"><div><h2>Latest decisions</h2><p>Follow the evidence behind every play</p></div><a class="button quiet" href="#ledger">Open ledger ↗</a></div>${ledgerTable(state.deliveries.slice(0, 3), true)}<div class="table-foot"><span>Automatic updates · every 2 seconds when live</span><span>Persisted decisions, live view <span class="status-dot"></span></span></div></section>`;
 }
 function overview() {
   return (
@@ -260,6 +330,7 @@ function overview() {
       `<a href="#lab" class="button">⌘ Failure lab</a><a href="#proof" class="button primary">◎ Run live proof</a>`,
     ) +
     metrics() +
+    `<div class="overview-next"><span><strong>${runtime.paused ? "Dispatcher paused" : (state.counts.accepted || 0) > 0 ? `${num(state.counts.accepted)} receipts awaiting a decision` : "Delivery queue is clear"}</strong> · ${(state.counts.quarantined || 0) + (state.counts.failed || 0) > 0 ? `${num((state.counts.quarantined || 0) + (state.counts.failed || 0))} exceptions recorded. Inspect the latest evidence and choose the next step.` : "Start a partner batch or verify the integration end to end."}</span><a href="#${runtime.paused ? "lab" : (state.counts.quarantined || 0) + (state.counts.failed || 0) > 0 ? "recovery" : "intake"}">${runtime.paused ? "Open controls" : (state.counts.quarantined || 0) + (state.counts.failed || 0) > 0 ? "Review exceptions" : "Open intake"} ↗</a></div>` +
     `<div class="network-grid">${network()}${flow()}</div><div class="bottom-grid">${campaignsTable()}${recent()}</div>`
   );
 }
@@ -274,30 +345,51 @@ function campaigns() {
   );
 }
 function filtered() {
-  return state.deliveries.filter(
+  const rows = state.deliveries.filter(
     (d) =>
       (active === "recovery"
-        ? ["quarantined", "failed"].includes(d.status)
+        ? ["quarantined", "failed"].includes(d.status) &&
+          (filter === "all" || d.status === filter)
         : filter === "all" || d.status === filter) &&
-      [d.id, d.event_id, d.screen_id, d.reservation_id].some((s) =>
-        s.toLowerCase().includes(search.toLowerCase()),
+      [d.id, d.event_id, d.screen_id, d.reservation_id, d.reason].some((v) =>
+        String(v || "")
+          .toLowerCase()
+          .includes(search.toLowerCase()),
       ),
+  );
+  return rows.sort((a, b) =>
+    ledgerSort === "oldest"
+      ? a.received_at - b.received_at || a.id.localeCompare(b.id)
+      : b.received_at - a.received_at || a.id.localeCompare(b.id),
+  );
+}
+function ledgerResults() {
+  const rows = filtered(),
+    pages = Math.max(1, Math.ceil(rows.length / 20));
+  ledgerPage = Math.min(ledgerPage, pages - 1);
+  const start = ledgerPage * 20;
+  return (
+    ledgerTable(rows.slice(start, start + 20)) +
+    `<div class="table-foot ledger-pagination"><span>${rows.length ? `${start + 1}–${Math.min(start + 20, rows.length)} of ${rows.length}` : "0 matches"} · newest 100 receipts searched</span><div><button class="button small" data-ledger-page="previous" ${ledgerPage === 0 ? "disabled" : ""} aria-label="Previous receipts page">← Previous</button><span>Page ${ledgerPage + 1} / ${pages}</span><button class="button small" data-ledger-page="next" ${ledgerPage >= pages - 1 ? "disabled" : ""} aria-label="Next receipts page">Next →</button></div></div>`
   );
 }
 function ledger() {
   const recovery = active === "recovery";
+  const options = recovery
+    ? ["all", "quarantined", "failed"]
+    : ["all", "settled", "duplicate", "accepted", "quarantined", "failed"];
   return (
     heading(
       recovery ? "Exceptions, explained." : "The evidence behind every play.",
       recovery
-        ? "Inspect the cause, preserve the evidence, and replay when the cause is resolved."
-        : "Immutable receipt payloads. Traceable decisions. No silent rounding-off.",
-      `<a href="#lab" class="button">${recovery ? "Open failure lab" : "Inject a scenario"} ↗</a>`,
+        ? "Find the cause. Choose the next step. Preserve the original evidence."
+        : "Search receipts, follow decisions, and inspect the evidence behind settlement.",
+      `<button class="button" data-export-receipts>Export matches ↓</button><a href="#${recovery ? "lab" : "intake"}" class="button primary">${recovery ? "Open failure lab" : "Partner intake"} ↗</a>`,
     ) +
     (recovery
-      ? '<div class="view-intro"><span class="big">↻</span><div>Replay never changes the original payload or bypasses validation. An unsupported schema will be quarantined again until consumer support is added. For a corrected proof, create a new event ID.</div></div>'
+      ? `<div class="recovery-guidance"><article><span class="badge quarantined">Quarantined</span><h3>Evidence needs correction</h3><p>Inspect the schema, screen, or play window. A corrected payload needs a new event ID.</p></article><article><span class="badge failed">Failed</span><h3>Processing exhausted its retries</h3><p>Resolve the operational cause, then replay the original receipt. Charge protection still applies.</p></article></div>`
       : "") +
-    `<div class="filters">${(recovery ? [] : ["all", "settled", "duplicate", "accepted", "quarantined", "failed"]).map((s) => `<button class="filter ${filter === s ? "active" : ""}" data-filter="${s}">${title(s)}</button>`).join("")}<input class="search" id="ledger-search" type="search" placeholder="Search receipt, screen, reservation…" aria-label="Search deliveries" value="${esc(search)}"></div><section class="panel" id="ledger-results">${ledgerTable(filtered())}<div class="table-foot"><span>Newest 100 receipts · ${filtered().length} shown</span><span>Select a receipt to inspect its decision ↗</span></div></section>`
+    `<div class="ledger-toolbar"><label class="ledger-search-label"><span>Search receipts</span><input class="search" id="ledger-search" type="search" placeholder="Event, receipt, screen, reservation or reason…" aria-label="Search deliveries" value="${esc(search)}"></label><label class="ledger-sort-label"><span>Sort by</span><select id="ledger-sort"><option value="newest" ${ledgerSort === "newest" ? "selected" : ""}>Newest first</option><option value="oldest" ${ledgerSort === "oldest" ? "selected" : ""}>Oldest first</option></select></label><button class="button quiet" data-clear-filters>Clear filters</button></div><div class="filters" aria-label="Filter by decision">${options.map((v) => `<button class="filter ${filter === v ? "active" : ""}" data-filter="${v}" aria-pressed="${filter === v}">${v === "all" ? "All decisions" : title(v)} <span>${state.deliveries.filter((d) => (!recovery || ["quarantined", "failed"].includes(d.status)) && (v === "all" || d.status === v)).length}</span></button>`).join("")}<span class="filter-scope">Counts within latest 100</span></div><section class="panel" id="ledger-results">${ledgerResults()}</section>`
   );
 }
 function lab() {
@@ -418,10 +510,8 @@ function render() {
     : "overview";
   if (next === "proof" && active === "proof" && $("#integration-proof")) return;
   if (next === "intake" && active === "intake" && $("#partner-intake")) return;
-  if (focus?.id === "ledger-search" && next === active) {
-    $("#ledger-results").innerHTML =
-      ledgerTable(filtered()) +
-      `<div class="table-foot">Newest 100 receipts · ${filtered().length} shown</div>`;
+  if (["ledger-search", "ledger-sort"].includes(focus?.id) && next === active) {
+    $("#ledger-results").innerHTML = ledgerResults();
     return;
   }
   const focusedAttribute = [
@@ -430,6 +520,9 @@ function render() {
     "data-delivery",
     "data-proof",
     "data-screen",
+    "data-ledger-page",
+    "data-clear-filters",
+    "data-export-receipts",
   ].find((a) => focus?.hasAttribute(a));
   const focusSelector =
     focusedAttribute && $("#main").contains(focus)
@@ -443,6 +536,7 @@ function render() {
     else a.removeAttribute("aria-current");
   });
   $("#breadcrumb-view").textContent = views[active];
+  document.title = `${views[active]} — Afterglow`;
   $(".synthetic-pill").textContent = "SYNTHETIC DATA";
   $("#main").innerHTML = {
     proof: integrationProof.render,
@@ -530,6 +624,7 @@ document.addEventListener("click", async (event) => {
     return;
   }
   if (b.dataset.filter) {
+    ledgerPage = 0;
     filter = b.dataset.filter;
     render();
     return;
@@ -582,9 +677,8 @@ document.addEventListener("keydown", (e) => {
 document.addEventListener("input", (e) => {
   if (e.target.id === "ledger-search") {
     search = e.target.value;
-    $("#ledger-results").innerHTML =
-      ledgerTable(filtered()) +
-      `<div class="table-foot">Newest 100 receipts · ${filtered().length} shown</div>`;
+    ledgerPage = 0;
+    $("#ledger-results").innerHTML = ledgerResults();
   }
 });
 document.addEventListener("submit", async (e) => {
@@ -658,8 +752,11 @@ $(".skip-link").addEventListener("click", (e) => {
 window.addEventListener("hashchange", () => {
   search = "";
   filter = "all";
+  ledgerPage = 0;
   render();
   window.scrollTo(0, 0);
 });
 refresh();
-setInterval(refresh, 2000);
+setInterval(() => {
+  if (!livePaused && !document.hidden) refresh();
+}, 2000);
