@@ -51,6 +51,9 @@ func run() error {
 	if _, err = db.DB.ExecContext(startup, `SELECT 1 FROM traffic_batches_v1 LIMIT 1`); err != nil {
 		return fmt.Errorf("measurement schema missing; run with FOOT_TRAFFIC_MIGRATE=true: %w", err)
 	}
+	if _, err = db.DB.ExecContext(startup, `SELECT 1 FROM traffic_scopes_v1 LIMIT 1`); err != nil {
+		return fmt.Errorf("measurement schema needs updating; run with FOOT_TRAFFIC_MIGRATE=true: %w", err)
+	}
 	handler := store.Handler(value("FOOT_TRAFFIC_TENANT", "demo"))
 	expected := sha256.Sum256([]byte("Bearer " + key))
 	slots := make(chan struct{}, 32)

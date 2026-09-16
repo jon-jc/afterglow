@@ -14,7 +14,7 @@ import (
 func TestSampleScenariosKeepIndependentImmutableWindows(t *testing.T) {
 	s, tenant := fixture(t)
 	ctx := context.Background()
-	for _, scenario := range []string{"baseline", "busy", "gaps", "quiet"} {
+	for _, scenario := range []string{"baseline", "busy", "gaps", "quiet", "commuter", "retail", "threshold", "interruption"} {
 		scope := scenarioTenant(tenant, scenario)
 		before, err := s.Report(ctx, scope, testNow)
 		if err != nil || before.Missing != 24 {
@@ -52,6 +52,14 @@ func TestSampleScenariosKeepIndependentImmutableWindows(t *testing.T) {
 			if r.Suppressed != 18 || r.Released != 6 || r.Missing != 0 {
 				t.Fatal("low counts were not suppressed", r)
 			}
+		case "threshold":
+			if r.Suppressed != 12 || r.Released != 12 || r.Published != 240 {
+				t.Fatal("publication boundary changed", r)
+			}
+		case "interruption":
+			if r.Missing != 8 {
+				t.Fatal("interruption did not preserve its missing hours", r)
+			}
 		}
 		// Advancing the report period must not change immutable overlapping hours.
 		later := testNow.Add(time.Hour)
@@ -77,7 +85,7 @@ func TestHTTPScenarioSelectionAndRefreshAreConsistent(t *testing.T) {
 		handler.ServeHTTP(w, r)
 		return w
 	}
-	for _, scenario := range []string{"baseline", "busy", "gaps", "quiet"} {
+	for _, scenario := range []string{"baseline", "busy", "gaps", "quiet", "commuter", "retail", "threshold", "interruption"} {
 		query := "?scenario=" + scenario
 		feed := call("GET", "example"+query, nil)
 		if feed.Code != 200 {

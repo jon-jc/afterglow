@@ -1,14 +1,16 @@
 package foottraffic
 
 import (
+	"crypto/rand"
 	"crypto/sha256"
+	"encoding/binary"
 	"fmt"
 	"time"
 )
 
 func validScenario(id string) bool {
 	switch id {
-	case "baseline", "busy", "gaps", "quiet":
+	case "baseline", "busy", "gaps", "quiet", "commuter", "retail", "threshold", "interruption", "random":
 		return true
 	}
 	return false
@@ -29,6 +31,9 @@ func scenarioTenant(tenant, scenario string) string {
 func ExampleForScenario(now time.Time, scenario string) (Batch, error) {
 	if !validScenario(scenario) {
 		return Batch{}, ErrInvalid
+	}
+	if scenario == "random" {
+		return randomExample(now)
 	}
 	b := Example(now)
 	if scenario == "baseline" {
@@ -52,6 +57,62 @@ func ExampleForScenario(now time.Time, scenario string) (Batch, error) {
 			if w.Zone == "downtown" {
 				w.Count = 20 + int64(hash[0])%15
 			}
+		case "commuter":
+			w.Count = 50 + int64(hash[0])%100
+			if w.Zone == "transit" {
+				hour := time.UnixMilli(w.Start).UTC().Hour()
+				w.Count = 150 + int64(hash[0])
+				if (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18) {
+					w.Count *= 4
+				}
+			}
+		case "retail":
+			w.Count = 35 + int64(hash[0])%90
+			if w.Zone == "retail" {
+				w.Count = 350 + int64(hash[0])*3
+			}
+		case "threshold":
+			// Alternate exactly below/at the publication boundary, not a
+			// random privacy guarantee. Stable across overlapping batches.
+			w.Count = 19 + (w.Start/3600000+int64(len(w.Zone)))%2
+		case "interruption":
+			if (w.Start/3600000)%6 < 2 {
+				continue
+			}
+		}
+		windows = append(windows, w)
+	}
+	b.Windows = windows
+	return b, nil
+}
+
+func randomExample(now time.Time) (Batch, error) {
+	var entropy [16 + 48*2]byte
+	if _, err := rand.Read(entropy[:]); err != nil {
+		return Batch{}, err
+	}
+	b := Example(now)
+	b.ID = fmt.Sprintf("random-%x", entropy[:16])
+	windows := make([]Window, 0, len(b.Windows))
+	for i, w := range b.Windows {
+		n := int64(binary.LittleEndian.Uint16(entropy[16+i*2:]))
+		// Always include one reported, one suppressed and one missing cell;
+		// the rest vary on each generation. Every value remains synthetic.
+		kind := n % 10
+		if i == 0 {
+			kind = 5
+		} else if i == 1 {
+			kind = 1
+		} else if i == 2 {
+			kind = 0
+		}
+		if kind == 0 {
+			continue
+		}
+		if kind < 3 {
+			w.Count = 2 + n%18
+		} else {
+			w.Count = 20 + n%981
 		}
 		windows = append(windows, w)
 	}

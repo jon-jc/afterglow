@@ -27,7 +27,7 @@
     check(!document.querySelector("#traffic-report .error-banner"), "Sample import returns a report");
   };
   const metrics = () => document.querySelector("#traffic-report .metrics").textContent;
-  for (const id of ["baseline", "busy", "gaps", "quiet"]) {
+  for (const id of ["baseline", "busy", "gaps", "commuter", "retail", "threshold", "interruption", "quiet"]) {
     await select(id);
     await load();
     const before = metrics();
@@ -44,6 +44,8 @@
     if (id === "busy") check(document.querySelectorAll(".traffic-bar.missing, .traffic-bar.suppressed").length === 0, "High activity has fully reportable pairs");
     if (id === "gaps") check(document.querySelectorAll(".traffic-bar.missing").length === 18, "Missing coverage remains missing across both days");
     if (id === "quiet") check(document.querySelectorAll(".traffic-bar.suppressed").length === 36, "Small windows remain suppressed across both days");
+    if (id === "threshold") check(document.querySelectorAll(".traffic-bar.suppressed").length === 24, "Boundary sample hides 19 and releases 20");
+    if (id === "interruption") check(document.querySelectorAll(".traffic-bar.missing").length === 16, "Interrupted hours remain missing across both days");
   }
   location.hash = "overview";
   await wait(() => !document.querySelector("#foot-traffic"));
@@ -87,6 +89,35 @@
   } finally {
     window.fetch = originalFetch;
   }
+  const quietMetrics = metrics();
+  const saved = () => JSON.parse(sessionStorage.getItem("afterglow.foot-traffic.v2"));
+  let lastRandomID;
+  for (let n = 0; n < 2; n++) {
+    document.querySelector("[data-traffic-random]").click();
+    await wait(ready);
+    check(document.querySelector("#traffic-sample").value === "random", "Generator selects its own sample");
+    const id = saved().attempts.random.batch.batch_id;
+    check(id !== lastRandomID, "Generation receives a new batch identity");
+    lastRandomID = id;
+    const before = metrics();
+    document.querySelector("[data-traffic-replay]").click();
+    await wait(ready);
+    check(metrics() === before && document.querySelector("#traffic-notice").textContent.includes("Replay verified"), "Random replay preserves the generated data");
+  }
+  document.querySelector("[data-traffic-empty]").click();
+  await wait(ready);
+  check(!!document.querySelector(".traffic-empty") && document.querySelectorAll(".traffic-chart").length === 0, "Empty batch removes all plotted observations");
+  check(document.querySelector("[data-traffic-replay]").disabled && !saved().attempts.random, "Empty batch clears replay state and its saved copy");
+  document.querySelector("[data-traffic-refresh]").click();
+  await wait(ready);
+  check(!!document.querySelector(".traffic-empty"), "Refresh cannot restore an emptied batch");
+  await select("quiet");
+  check(metrics() === quietMetrics, "Emptying random leaves another sample unchanged");
+  document.querySelector("[data-traffic-empty]").click();
+  await wait(ready);
+  check(!!document.querySelector(".traffic-empty"), "A fixed sample can also be emptied");
+  await load();
+  check(!document.querySelector(".traffic-empty") && !document.querySelector("[data-traffic-replay]").disabled, "Load works again after Empty batch");
   check(document.documentElement.scrollWidth <= innerWidth, "No horizontal page overflow");
   return { passed: true, checks };
 })();
