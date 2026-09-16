@@ -3,11 +3,13 @@ on:
   push:
     branches: [main]
   pull_request:
+  workflow_dispatch:
 permissions:
   contents: read
 jobs:
   go:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     services:
       postgres:
         image: postgres:17-alpine
@@ -17,7 +19,7 @@ jobs:
           POSTGRES_DB: afterglow
         ports: ['5432:5432']
         options: >-
-          --health-cmd 'pg_isready -U afterglow'
+          --health-cmd "pg_isready -U afterglow -d afterglow"
           --health-interval 5s --health-timeout 5s --health-retries 10
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +45,7 @@ jobs:
       - run: node scripts/smoke.mjs
   terraform:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
