@@ -45,6 +45,16 @@ func (s *Server) Handler() http.Handler {
 		s.Airports.ServeHTTP(w, r)
 	})
 	mux.HandleFunc("POST /api/v1/receipts/batch", s.acceptBatch)
+	mux.HandleFunc("GET /api/v1/deliveries/{id}", func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		v, err := s.Store.Evidence(ctx, s.Tenant, r.PathValue("id"))
+		if err != nil {
+			fail(w, err)
+			return
+		}
+		respond(w, 200, v)
+	})
 	mux.HandleFunc("GET /api/v1/runtime", func(w http.ResponseWriter, r *http.Request) {
 		if s.Runtime != nil {
 			respond(w, 200, s.Runtime())

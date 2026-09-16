@@ -24,6 +24,7 @@ const time = (n) =>
   });
 const title = (s) => s.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase());
 const views = {
+  proof: "Live integration proof",
   intake: "Partner intake",
   overview: "Overview",
   campaigns: "Campaigns",
@@ -256,7 +257,7 @@ function overview() {
     heading(
       "Every play. Accounted for.",
       "A clear view of campaign delivery, from reservation to reconciliation.",
-      `<a href="#lab" class="button">⌘ Failure lab</a>${button("▷ Simulate traffic", "traffic", true)}`,
+      `<a href="#lab" class="button">⌘ Failure lab</a><a href="#proof" class="button primary">◎ Run live proof</a>`,
     ) +
     metrics() +
     `<div class="network-grid">${network()}${flow()}</div><div class="bottom-grid">${campaignsTable()}${recent()}</div>`
@@ -415,6 +416,7 @@ function render() {
   const next = Object.hasOwn(views, location.hash.slice(1))
     ? location.hash.slice(1)
     : "overview";
+  if (next === "proof" && active === "proof" && $("#integration-proof")) return;
   if (next === "intake" && active === "intake" && $("#partner-intake")) return;
   if (focus?.id === "ledger-search" && next === active) {
     $("#ledger-results").innerHTML =
@@ -443,6 +445,7 @@ function render() {
   $("#breadcrumb-view").textContent = views[active];
   $(".synthetic-pill").textContent = "SYNTHETIC DATA";
   $("#main").innerHTML = {
+    proof: integrationProof.render,
     intake: partnerIntake.render,
     overview,
     campaigns,

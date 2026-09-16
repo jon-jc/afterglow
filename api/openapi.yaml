@@ -8,6 +8,22 @@ servers:
 security:
   - bearer: []
 paths:
+  /api/v1/deliveries/{id}:
+    get:
+      operationId: getDeliveryEvidence
+      summary: Read an exact receipt and its reservation from a consistent database snapshot
+      description: Tenant-scoped evidence independent of the recent snapshot window. Outbox acknowledgement may lag a committed settlement. A receipt for an unknown reservation omits reservation.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema: {type: string, minLength: 1, maxLength: 100, pattern: '^[a-zA-Z0-9_-]+$'}
+      responses:
+        '200': {description: 'DeliveryEvidence with delivery, optional reservation, outbox_state, dispatch_attempts and observed_at in Unix milliseconds.'}
+        '401': {description: Invalid credential}
+        '404': {description: Receipt not found in the authenticated tenant}
+        '422': {description: Invalid identifier}
+        '503': {description: Storage unavailable}
   /api/v1/airports:
     get:
       operationId: searchAirportCatalog
