@@ -1,5 +1,7 @@
 # Afterglow
 
+[![Verify](https://github.com/jon-jc/afterglow/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/jon-jc/afterglow/actions/workflows/ci.yml?query=branch%3Amain+event%3Apush)
+
 ### Every play. Accounted for.
 
 A Go backend and operations console for digital out-of-home playback reconciliation. Reserve campaign budget, accept partner receipts durably, and settle only when the evidence matches. Then break the pipeline and watch it recover.
