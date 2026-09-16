@@ -5,7 +5,7 @@
  const original=window.fetch;
  try {
   location.hash='assurance';await wait(()=>document.querySelector('.assurance-verdict'));
-  check(document.querySelector('.assurance-scope').textContent.includes('not a measured audience'),'Report distinguishes operations from audience outcomes');
+  check(document.querySelector('#assurance-report .assurance-scope').textContent.includes('not a measured audience'),'Report distinguishes operations from audience outcomes');
   const select=document.querySelector('#assurance-campaign');
   let release,slow=true;
   window.fetch=async(url,opts)=>{const r=await original(url,opts);if(String(url).includes('/assurance')&&slow){slow=false;await new Promise(resolve=>release=resolve);}return r;};

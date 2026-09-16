@@ -82,7 +82,21 @@ const integrationProof = (() => {
   function render() {
     return `<div id="integration-proof">${contents()}</div>`;
   }
+  function inlineContents(campaign) {
+    const done = run?.steps.every((s) => s.done);
+    return `<div class="panel-header"><div><h2>Live proof, right here</h2><p>New runs use the selected campaign. An unfinished run resumes its original identities.</p></div><button class="button primary" data-proof-run data-proof-campaign="${esc(campaign)}" ${running || !runtime.demo ? "disabled" : ""}>${running ? "Verifying…" : run && !done ? "Resume existing run" : "Run live proof · $0.02"}</button></div><div class="inline-proof-body"><p class="proof-status" role="status">${esc(message || "Run all six checks without leaving Campaign assurance.")}${run ? `<br>Evidence campaign: ${esc(run.plan.campaign)} · ${run.steps.filter((s) => s.done).length}/6 stages verified` : ""}${storageWarning ? `<br>${esc(storageWarning)}` : ""}</p><p class="assurance-scope">Creates two $0.01 synthetic reservations. No real purchase. The campaign report refreshes after completion.</p>${run ? `<ol class="inline-proof-steps">${cards()}</ol><div class="inline-proof-evidence">${evidence()}</div><button class="button" data-proof-export>Export proof evidence ↓</button>` : ""}</div>`;
+  }
+  function renderInline(campaign) {
+    return `<section class="panel inline-proof" id="inline-proof" data-campaign="${esc(campaign)}">${inlineContents(campaign)}</section>`;
+  }
+  function updateInline() {
+    const panel = $("#inline-proof");
+    if (panel) panel.innerHTML = inlineContents(panel.dataset.campaign);
+    const select = $("#assurance-campaign");
+    if (select) select.disabled = running;
+  }
   function update() {
+    updateInline();
     if (!$("#integration-proof")) return;
     const focus = document.activeElement;
     const restore = focus?.hasAttribute("data-proof-run")
@@ -130,18 +144,21 @@ const integrationProof = (() => {
       await new Promise((r) => setTimeout(r, 350));
     }
   }
-  async function execute() {
+  async function execute(campaign) {
     if (running || !runtime.demo) return;
     running = true;
+    update();
     try {
       if (!run || run.steps.every((s) => s.done)) {
         const fresh = await request("/api/v1/snapshot");
         const c = fresh.campaigns.find(
-          (c) => c.budget_micros - c.spent_micros - c.reserved_micros >= 20000,
+          (c) =>
+            (!campaign || c.id === campaign) &&
+            c.budget_micros - c.spent_micros - c.reserved_micros >= 20000,
         );
         assert(
           c && fresh.screens.length,
-          "No campaign has $0.02 available. Inspect campaign budgets first.",
+          "The requested campaign has insufficient available budget, or no campaign is available. This run requires $0.02.",
         );
         run = {
           version: 1,
@@ -277,6 +294,7 @@ const integrationProof = (() => {
       message =
         "All six stages verified against persisted receipt and reservation records.";
       await refresh();
+      document.dispatchEvent(new CustomEvent("afterglow:proof-complete"));
     } catch (e) {
       message =
         e.message +
@@ -292,7 +310,7 @@ const integrationProof = (() => {
   }
   document.addEventListener("click", async (e) => {
     if (e.target.closest("[data-proof-run]")) {
-      await execute();
+      await execute(e.target.closest("[data-proof-run]").dataset.proofCampaign);
       return;
     }
     if (e.target.closest("[data-proof-export]") && run) {
@@ -328,5 +346,5 @@ const integrationProof = (() => {
       );
     }
   });
-  return { render };
+  return { render, renderInline, updateInline };
 })();
