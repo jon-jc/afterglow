@@ -7,6 +7,7 @@
     <title>Afterglow — Delivery intelligence</title>
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="stylesheet" href="/style.css" />
+    <script src="/demo-reset.js" defer></script>
     <script src="/intake.js" defer></script>
     <script src="/proof.js" defer></script>
     <script src="/assurance.js" defer></script>
@@ -89,6 +90,7 @@
           <strong id="breadcrumb-view">Overview</strong>
         </div>
         <div class="topbar-right">
+          <button id="reset-demo" class="button small reset-demo-button" aria-haspopup="dialog" title="Clear all demo activity and start a fresh run" hidden>Clear demo data</button>
           <button
             id="live-toggle"
             class="live-toggle"
@@ -149,6 +151,22 @@
       />
       <nav id="navigation-results" aria-label="Page shortcuts"></nav>
       <p class="nav-hint">↑ ↓ to move · Enter to open · Esc to close</p>
+    </dialog>
+    <dialog id="reset-demo-dialog" aria-labelledby="reset-demo-title" aria-describedby="reset-demo-description">
+      <div class="eyebrow">FRESH RUN</div>
+      <h2 id="reset-demo-title">Clear all demo data?</h2>
+      <p id="reset-demo-description">Remove all playback receipts, reservations, recovery and audit history, plus every foot-traffic sample from this local demo.</p>
+      <ul class="reset-demo-list">
+        <li>Restore campaign budgets to their full available amounts.</li>
+        <li>Clear saved proof runs and remembered sample batches.</li>
+        <li>Resume the worker with failure simulations turned off.</li>
+      </ul>
+      <p>Campaigns and screen inventory stay ready for your next run. Other open demo tabs will refresh. This cannot be undone.</p>
+      <p id="reset-demo-notice" role="status" aria-live="polite"></p>
+      <div class="dialog-actions">
+        <button id="cancel-demo-reset" class="button" autofocus>Keep my data</button>
+        <button id="confirm-demo-reset" class="button reset-demo-confirm">Clear all demo data</button>
+      </div>
     </dialog>
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <dialog id="detail-dialog" aria-labelledby="dialog-title">

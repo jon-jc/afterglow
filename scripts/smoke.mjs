@@ -211,6 +211,35 @@ try {
   assert.equal(baselineAfter.published_observations, traffic.data.published_observations);
   assert.equal(spent((await req("/api/v1/snapshot")).data), spent(s));
   checks.push("Random replacement, retry and empty preserve other samples and settlement");
+  const generation = (await fetch(url + "/api/v1/runtime")).headers.get("X-Demo-Generation");
+  assert.ok(generation);
+  assert.equal((await req("/api/demo/reset", {})).status, 422);
+  await req("/api/demo/control", { paused: true });
+  await scenario("retry");
+  const reset = await req("/api/demo/reset", { confirm: true }, { "X-Demo-Generation": generation });
+  assert.equal(reset.status, 200);
+  assert.notEqual(reset.data.generation, generation);
+  s = (await req("/api/v1/snapshot")).data;
+  assert.equal(s.deliveries.length, 0);
+  assert.equal(s.reservations.length, 0);
+  assert.equal(s.audit.length, 0);
+  assert.equal(spent(s), 0);
+  assert.ok(s.campaigns.every(c => c.reserved_micros === 0));
+  assert.equal(s.screens.length, 8);
+  assert.equal((await req("/api/v1/runtime")).data.paused, false);
+  for (const sample of ["baseline", "busy", "gaps", "quiet", "commuter", "retail", "threshold", "interruption", "random"]) {
+    const r = (await req(`/api/v1/foot-traffic/report?scenario=${sample}`)).data;
+    assert.equal(r.published_observations, 0);
+    assert.equal(r.missing_windows, 24);
+    assert.ok(r.zones.every(z => [...z.current, ...z.previous].every(c => c.status === "missing")));
+  }
+  const stale = await req("/api/demo/scenario", { kind: "traffic" }, { "X-Demo-Generation": generation });
+  assert.equal(stale.status, 409);
+  assert.equal((await req("/api/v1/snapshot")).data.deliveries.length, 0);
+  checks.push("Clear demo removes all activity and samples, restores budgets, resumes worker and fences stale tabs");
+  await scenario("duplicate");
+  s = await until(s => s.counts.settled === 1 && s.counts.duplicate === 4, "Fresh run settles once after a complete reset");
+  assert.equal(spent(s), 1250000);
   mkdirSync(path.join(root, "artifacts"), { recursive: true });
   const report = {
     passed: true,

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"context"
+	"errors"
 	"path/filepath"
 	"testing"
 	"time"
@@ -9,6 +10,67 @@ import (
 	"github.com/jon-jc/afterglow/internal/core"
 	"github.com/prometheus/client_golang/prometheus"
 )
+
+func TestLocalResetClearsFaultsOnlyAfterSuccess(t *testing.T) {
+	w, _ := setup(t)
+	w.Paused.Store(true)
+	w.FailNext.Store(5)
+	w.DropAck.Store(true)
+	for i := 0; i < 3; i++ {
+		w.markFailure()
+	}
+	_, err := w.ResetLocalDemo(context.Background(), func(context.Context) (string, error) { return "", errors.New("rollback") })
+	if err == nil || !w.Paused.Load() || w.FailNext.Load() != 5 || !w.DropAck.Load() || !w.BreakerOpen() {
+		t.Fatal("failed reset changed fault controls")
+	}
+	g, err := w.ResetLocalDemo(context.Background(), func(context.Context) (string, error) { return "new", nil })
+	if err != nil || g != "new" || w.Paused.Load() || w.FailNext.Load() != 0 || w.DropAck.Load() || w.BreakerOpen() {
+		t.Fatal("successful reset did not restore worker", err)
+	}
+}
+
+func TestLocalResetWaitsForDispatch(t *testing.T) {
+	w, id := setup(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	// Occupy SQLite's only connection so Tick holds the dispatch guard while
+	// awaiting storage. Reset must not run until that dispatch has completed.
+	conn, err := w.Store.DB.Conn(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+	ticked := make(chan error, 1)
+	go func() { ticked <- w.Tick(ctx) }()
+	for w.operation.TryLock() {
+		w.operation.Unlock()
+		select {
+		case <-ctx.Done():
+			t.Fatal("dispatcher did not start")
+		default:
+			time.Sleep(time.Millisecond)
+		}
+	}
+	finished := make(chan error, 1)
+	go func() {
+		_, err := w.ResetLocalDemo(ctx, func(ctx context.Context) (string, error) {
+			var status string
+			err := w.Store.DB.QueryRowContext(ctx, `SELECT status FROM deliveries WHERE id=$1`, id).Scan(&status)
+			if err == nil && status != "settled" {
+				err = errors.New("reset ran before dispatch finished")
+			}
+			return "new", err
+		})
+		finished <- err
+	}()
+	conn.Close()
+	if err = <-ticked; err != nil {
+		t.Fatal(err)
+	}
+	if err = <-finished; err != nil {
+		t.Fatal(err)
+	}
+}
 
 func setup(t *testing.T) (*Worker, string) {
 	t.Helper()

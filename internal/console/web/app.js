@@ -50,7 +50,7 @@ let state = null,
   ledgerPage = 0,
   ledgerSort = "newest";
 async function request(path, body, headers = {}) {
-  const response = await fetch(path, {
+  const response = await demoSession.fetch(path, {
     signal: AbortSignal.timeout(12000),
     method: body === undefined ? "GET" : "POST",
     headers: {
@@ -94,6 +94,7 @@ async function refresh() {
       request("/api/v1/runtime"),
     ]);
     $("#connection-label").textContent = "Engine connected";
+    $("#reset-demo").hidden = !runtime.can_reset;
     $("#connection-dot").classList.remove("bad");
     $("#storage-label").textContent =
       runtime.storage +

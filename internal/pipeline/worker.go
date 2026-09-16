@@ -30,6 +30,7 @@ type Worker struct {
 	mu        sync.Mutex
 	failures  int
 	openUntil time.Time
+	operation sync.Mutex // Excludes local dispatch/sweeps while resetting the demo.
 }
 
 func New(s *core.Store, reg *prometheus.Registry) *Worker {
@@ -106,6 +107,8 @@ func (w *Worker) Consume(ctx context.Context, tenant, id string) error {
 	return nil
 }
 func (w *Worker) Tick(ctx context.Context) error {
+	w.operation.Lock()
+	defer w.operation.Unlock()
 	if w.Paused.Load() || w.BreakerOpen() {
 		return nil
 	}
@@ -141,6 +144,32 @@ func (w *Worker) Tick(ctx context.Context) error {
 	}
 	return e
 }
+
+// ResetLocalDemo waits for in-flight local work. Fault controls are only cleared
+// after the database reset commits; a failed reset leaves the worker unchanged.
+func (w *Worker) ResetLocalDemo(ctx context.Context, reset func(context.Context) (string, error)) (string, error) {
+	w.operation.Lock()
+	defer w.operation.Unlock()
+	if w.Store.Postgres || w.Publisher != nil {
+		return "", errors.New("reset requires local SQLite transport")
+	}
+	generation, err := reset(ctx)
+	if err != nil {
+		return "", err
+	}
+	w.FailNext.Store(0)
+	w.DropAck.Store(false)
+	w.markSuccess()
+	w.Paused.Store(false)
+	return generation, nil
+}
+
+func (w *Worker) releaseExpired(ctx context.Context) error {
+	w.operation.Lock()
+	defer w.operation.Unlock()
+	return w.Store.ReleaseExpired(ctx, time.Now().UnixMilli())
+}
+
 func (w *Worker) Run(ctx context.Context) {
 	ticker := time.NewTicker(75 * time.Millisecond)
 	defer ticker.Stop()
@@ -155,7 +184,7 @@ func (w *Worker) Run(ctx context.Context) {
 				slog.Warn("dispatch_retry", "error", e)
 			}
 		case <-sweep.C:
-			if e := w.Store.ReleaseExpired(ctx, time.Now().UnixMilli()); e != nil {
+			if e := w.releaseExpired(ctx); e != nil {
 				slog.Warn("expiry_sweep_failed", "error", e)
 			}
 		}

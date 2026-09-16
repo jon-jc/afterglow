@@ -50,6 +50,7 @@ const integrationProof = (() => {
     /* A corrupt or unavailable cache must not block the console. */
   }
   function save() {
+    if (!demoSession.active()) return;
     try {
       sessionStorage.setItem(storageKey, JSON.stringify(run));
     } catch {
@@ -108,7 +109,7 @@ const integrationProof = (() => {
     if (restore) $(restore)?.focus({ preventScroll: true });
   }
   async function batch(body) {
-    const response = await fetch("/api/v1/receipts/batch", {
+    const response = await demoSession.fetch("/api/v1/receipts/batch", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),

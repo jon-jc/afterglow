@@ -17,6 +17,7 @@ import (
 	"github.com/jon-jc/afterglow/internal/core"
 	"github.com/jon-jc/afterglow/internal/foottraffic"
 	"github.com/jon-jc/afterglow/internal/httpapi"
+	"github.com/jon-jc/afterglow/internal/localdemo"
 	"github.com/jon-jc/afterglow/internal/pipeline"
 	"github.com/jon-jc/afterglow/internal/telemetry"
 	"github.com/prometheus/client_golang/prometheus"
@@ -125,6 +126,18 @@ func run() error {
 	} else if transport != "local" {
 		return core.ErrInvalid
 	}
+	canReset := demo && !store.Postgres && transport == "local" && role == "all"
+	if canReset {
+		api.DemoGeneration, err = localdemo.Initialize(startup, store)
+		if err != nil {
+			return err
+		}
+		api.ResetDemo = func(ctx context.Context) (string, error) {
+			return worker.ResetLocalDemo(ctx, func(ctx context.Context) (string, error) {
+				return localdemo.Reset(ctx, store)
+			})
+		}
+	}
 	if role != "api" {
 		go func() { defer close(workerDone); worker.Run(workerCtx) }()
 		if bus != nil {
@@ -145,7 +158,7 @@ func run() error {
 	api.Metrics = promhttp.HandlerFor(reg, promhttp.HandlerOpts{})
 	api.DemoHandler = httpapi.Demo(store, worker, tenant)
 	api.Runtime = func() any {
-		return map[string]any{"transport": transport, "storage": map[bool]string{true: "PostgreSQL", false: "SQLite WAL"}[store.Postgres], "demo": demo, "paused": worker.Paused.Load(), "breaker_open": worker.BreakerOpen(), "role": role}
+		return map[string]any{"can_reset": canReset, "transport": transport, "storage": map[bool]string{true: "PostgreSQL", false: "SQLite WAL"}[store.Postgres], "demo": demo, "paused": worker.Paused.Load(), "breaker_open": worker.BreakerOpen(), "role": role}
 	}
 	srv := &http.Server{Addr: addr, Handler: api.Handler(), ReadHeaderTimeout: 3 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 15 * time.Second, IdleTimeout: 60 * time.Second, MaxHeaderBytes: 16384}
 	done := make(chan error, 1)

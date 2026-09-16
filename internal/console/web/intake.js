@@ -252,7 +252,7 @@ const partnerIntake = (() => {
     notice = "Sending to the Go intake API…";
     update();
     try {
-      const response = await fetch("/api/v1/receipts/batch", {
+      const response = await demoSession.fetch("/api/v1/receipts/batch", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(body),
