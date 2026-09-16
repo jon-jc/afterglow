@@ -26,6 +26,21 @@ const partnerIntake = (() => {
       "Playback predates the reservation. Expect durable acceptance, then quarantine.",
     ],
   };
+  let price = "0.01";
+  function priceMicros() {
+    const value = price.trim();
+    if (!/^\d{1,9}(\.\d{1,2})?$/.test(value))
+      throw new Error(
+        "Enter a USD amount with up to two decimal places, at least $0.01.",
+      );
+    const [dollars, cents = ""] = value.split(".");
+    const micros =
+      (Number(dollars) * 100 + Number(cents.padEnd(2, "0"))) * 10000;
+    if (micros > 1000000000)
+      throw new Error("The maximum reservation is $1,000.00.");
+    if (micros < 10000) throw new Error("The minimum reservation is $0.01.");
+    return micros;
+  }
   let exampleKind = "partial",
     examplePlan = null,
     preparing = false;
@@ -46,6 +61,8 @@ const partnerIntake = (() => {
     $("#intake-results").innerHTML = results();
     $("#intake-payload").disabled = pending;
     $("#intake-example").disabled = pending;
+    $("#intake-price").disabled =
+      pending || !!(examplePlan && !examplePlan.hold);
     $("#example-explanation").textContent = examples[exampleKind][1];
     $('[data-intake="example"]').textContent = preparing
       ? "Preparing…"
@@ -64,7 +81,7 @@ const partnerIntake = (() => {
         '<a class="button" href="#ledger">Open delivery ledger ↗</a>',
         "PARTNER INTEGRATION",
       ) +
-      `<div id="partner-intake"><div class="view-intro"><span class="big">⇄</span><div>Synthetic partner contract · Real Go API. Accepted receipts change the local demo database. This is not a connected or certified Vistar integration.</div></div><div class="intake-grid"><section class="panel intake-card"><h2>1. Prepare a playback batch</h2><p>Choose a scenario and load its request. Loading automatically reserves $0.01 of synthetic budget when needed; playback is sent only when you click Send batch. Repeated loads reuse the unsent hold.</p><label for="intake-example">Example scenario</label><select id="intake-example" ${pending ? "disabled" : ""}>${Object.entries(
+      `<div id="partner-intake"><div class="view-intro"><span class="big">⇄</span><div>Synthetic partner contract · Real Go API. Accepted receipts change the local demo database. This is not a connected or certified Vistar integration.</div></div><div class="intake-grid"><section class="panel intake-card"><h2>1. Prepare a playback batch</h2><p>Choose a scenario and load its request. Loading reserves your chosen amount of synthetic budget when needed; playback is sent only when you click Send batch. Repeated loads at the same price reuse the unsent hold. Changing the price creates a new hold; earlier holds remain reserved until settled or expired.</p><label for="intake-example">Example scenario</label><select id="intake-example" ${pending ? "disabled" : ""}>${Object.entries(
         examples,
       )
         .map(
@@ -73,7 +90,7 @@ const partnerIntake = (() => {
         )
         .join(
           "",
-        )}</select><p id="example-explanation">${examples[exampleKind][1]}</p><div class="actions"><button class="button" data-intake="example" ${pending || !runtime.demo ? "disabled" : ""}>Load example</button></div><label for="intake-payload">Request body · up to 50 receipts</label><textarea id="intake-payload" spellcheck="false" ${pending ? "disabled" : ""} placeholder='{"receipts": [...]}' aria-describedby="intake-status">${esc(draft)}</textarea><div class="actions"><button id="intake-submit" class="button primary" data-intake="send" ${pending || !runtime.demo ? "disabled" : ""}>${pending && !preparing ? "Sending…" : "Send batch →"}</button></div><p id="intake-status" class="intake-status" role="status">${esc(notice)}</p></section><section class="panel intake-card"><h2>2. Inspect durable acceptance</h2><p>A 202 item means the receipt and outbox committed together. A 207 batch contains mixed results. Settlement happens asynchronously; acceptance alone is not a charge.</p><div id="intake-results" aria-live="polite">${results()}</div></section></div><div class="decision-grid"><article class="panel decision"><h3>Event identity</h3><p>An unchanged event ID and payload return the original receipt. Changing content under the same ID produces a conflict.</p></article><article class="panel decision"><h3>Business identity</h3><p>Two different events can report one play. The reservation transition prevents a second financial effect.</p></article><article class="panel decision"><h3>Recoverable failures</h3><p>On a timeout, the outcome may be unknown. Keep IDs and content unchanged. Honor Retry-After on 429; inspect quarantined evidence in Recovery queue.</p></article><article class="panel decision"><h3>Transport boundary</h3><p>Current transport: ${esc(runtime.transport)}. The SQL outbox separates API acceptance from delivery. The managed Pub/Sub path requires separate staging verification.</p></article></div></div>`
+        )}</select><p id="example-explanation">${examples[exampleKind][1]}</p><label for="intake-price">Reservation price · USD</label><input id="intake-price" type="text" inputmode="decimal" value="${esc(price)}" aria-describedby="intake-price-help" ${pending || (examplePlan && !examplePlan.hold) ? "disabled" : ""}><p id="intake-price-help">$0.01–$1,000.00, up to two decimal places. Applies when you load a new example. Existing reservations are unchanged.</p><div class="actions"><button class="button" data-intake="example" ${pending || !runtime.demo ? "disabled" : ""}>Load example</button></div><label for="intake-payload">Request body · up to 50 receipts</label><textarea id="intake-payload" spellcheck="false" ${pending ? "disabled" : ""} placeholder='{"receipts": [...]}' aria-describedby="intake-status">${esc(draft)}</textarea><div class="actions"><button id="intake-submit" class="button primary" data-intake="send" ${pending || !runtime.demo ? "disabled" : ""}>${pending && !preparing ? "Sending…" : "Send batch →"}</button></div><p id="intake-status" class="intake-status" role="status">${esc(notice)}</p></section><section class="panel intake-card"><h2>2. Inspect durable acceptance</h2><p>A 202 item means the receipt and outbox committed together. A 207 batch contains mixed results. Settlement happens asynchronously; acceptance alone is not a charge.</p><div id="intake-results" aria-live="polite">${results()}</div></section></div><div class="decision-grid"><article class="panel decision"><h3>Event identity</h3><p>An unchanged event ID and payload return the original receipt. Changing content under the same ID produces a conflict.</p></article><article class="panel decision"><h3>Business identity</h3><p>Two different events can report one play. The reservation transition prevents a second financial effect.</p></article><article class="panel decision"><h3>Recoverable failures</h3><p>On a timeout, the outcome may be unknown. Keep IDs and content unchanged. Honor Retry-After on 429; inspect quarantined evidence in Recovery queue.</p></article><article class="panel decision"><h3>Transport boundary</h3><p>Current transport: ${esc(runtime.transport)}. The SQL outbox separates API acceptance from delivery. The managed Pub/Sub path requires separate staging verification.</p></article></div></div>`
     );
   }
   document.addEventListener("change", (e) => {
@@ -86,11 +103,26 @@ const partnerIntake = (() => {
   });
   document.addEventListener("input", (e) => {
     if (e.target.id === "intake-payload") draft = e.target.value;
+    if (e.target.id === "intake-price") {
+      price = e.target.value;
+      notice =
+        "Click Load example to apply this price. The current request body and existing reservation are unchanged.";
+      update();
+    }
   });
   document.addEventListener("click", async (e) => {
     const b = e.target.closest("[data-intake]");
     if (!b || pending || !runtime.demo) return;
     if (b.dataset.intake === "example") {
+      let cost;
+      try {
+        cost = priceMicros();
+      } catch (e) {
+        notice = e.message;
+        update();
+        $("#intake-price").focus();
+        return;
+      }
       pending = true;
       preparing = true;
       notice = "Preparing a real demo reservation…";
@@ -98,23 +130,24 @@ const partnerIntake = (() => {
       try {
         if (
           !examplePlan ||
-          (examplePlan.hold && examplePlan.hold.expires_at <= Date.now())
+          (examplePlan.hold &&
+            (examplePlan.hold.expires_at <= Date.now() ||
+              examplePlan.input.cost_micros !== cost))
         ) {
           const snapshot = await request("/api/v1/snapshot");
           const campaign = snapshot.campaigns.find(
-            (c) =>
-              c.budget_micros - c.spent_micros - c.reserved_micros >= 10000,
+            (c) => c.budget_micros - c.spent_micros - c.reserved_micros >= cost,
           );
           if (!campaign || !snapshot.screens.length)
             throw new Error(
-              "No campaign has $0.01 available. Check campaign budgets.",
+              `No campaign has ${money(cost)} available. Lower the price or check campaign budgets.`,
             );
           examplePlan = {
             key: crypto.randomUUID(),
             input: {
               campaign_id: campaign.id,
               screen_id: snapshot.screens[0].id,
-              cost_micros: 10000,
+              cost_micros: cost,
             },
           };
         }
@@ -164,7 +197,7 @@ const partnerIntake = (() => {
         if ($("#intake-payload")) $("#intake-payload").value = draft;
         result = null;
         notice =
-          "Example ready. A $0.01 demo hold is reserved; no playback receipts have been sent. " +
+          `Example ready. A ${money(r.cost_micros)} demo hold is reserved; no playback receipts have been sent. ` +
           examples[exampleKind][1];
       } catch (e) {
         notice =
