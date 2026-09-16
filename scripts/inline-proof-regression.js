@@ -2,7 +2,7 @@
 (async()=>{
  const check=(v,s)=>{if(!v)throw new Error(s);};
  const wait=async f=>{for(let i=0;i<300;i++){if(f())return;await new Promise(r=>setTimeout(r,100));}throw new Error('Inline proof timeout');};
- location.hash='assurance';await wait(()=>document.querySelector('#inline-proof'));
+ location.hash='assurance';await wait(()=>document.querySelector('#assurance-campaign') && document.querySelector('#inline-proof'));
  const select=document.querySelector('#assurance-campaign');select.value='cmp-northstar';select.dispatchEvent(new Event('change',{bubbles:true}));
  await wait(()=>document.querySelector('.assurance-verdict'));
  const before=await (await fetch('/api/v1/campaigns/cmp-northstar/assurance')).json();
